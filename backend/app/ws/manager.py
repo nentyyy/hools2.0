@@ -19,6 +19,12 @@ REPLAY_LIMIT = 50
 REPLAY_TTL = 600
 
 
+def _encode(message: dict[str, Any]) -> str:
+    """Serialise a frame. `default=str` matters: game payloads carry datetimes,
+    which `send_json` would refuse."""
+    return json.dumps(message, default=str)
+
+
 class ConnectionManager:
     def __init__(self) -> None:
         self._connections: dict[str, set[WebSocket]] = defaultdict(set)
@@ -44,18 +50,22 @@ class ConnectionManager:
         logger.info("ws_disconnected", extra={"channel": channel})
 
     async def broadcast_local(self, channel: str, message: dict[str, Any]) -> None:
+        payload = _encode(message)
         dead: list[WebSocket] = []
         for websocket in list(self._connections.get(channel, ())):
             try:
-                await websocket.send_json(message)
+                await websocket.send_text(payload)
             except Exception:
                 dead.append(websocket)
         for websocket in dead:
             await self.disconnect(channel, websocket)
 
     async def send(self, websocket: WebSocket, message: dict[str, Any]) -> None:
-        with contextlib.suppress(Exception):
-            await websocket.send_json(message)
+        try:
+            await websocket.send_text(_encode(message))
+        except Exception:
+            # A closed socket is normal; anything else must not stay invisible.
+            logger.debug("ws send failed", exc_info=True)
 
     async def remember(self, channel: str, message: dict[str, Any]) -> None:
         """Append to the replay buffer used by the HTTP polling fallback."""
