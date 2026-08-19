@@ -1,0 +1,24 @@
+# Environment variables to set in the Vercel project
+# (Project → Settings → Environment Variables). Everything here is server-side
+# except the VITE_* entries, which are baked into the public bundle.
+
+BOT_TOKEN=
+BOT_USERNAME=
+WEBAPP_URL=https://<your-project>.vercel.app
+TELEGRAM_WEBHOOK_SECRET=
+DATABASE_URL=postgresql://user:password@host/db?sslmode=require
+DB_STATEMENT_CACHE_SIZE=0
+REDIS_URL=rediss://default:password@host:6379
+JWT_SECRET=
+INTERNAL_API_TOKEN=
+CRON_SECRET=
+ADMIN_TELEGRAM_IDS=
+ENVIRONMENT=production
+ENABLE_SCHEDULER=0
+CORS_ORIGINS=https://<your-project>.vercel.app
+TON_MANIFEST_URL=https://<your-project>.vercel.app/tonconnect-manifest.json
+TON_RECEIVER_ADDRESS=
+
+VITE_API_URL=
+VITE_TON_MANIFEST_URL=https://<your-project>.vercel.app/tonconnect-manifest.json
+VITE_BOT_USERNAME=

@@ -1,0 +1,15 @@
+# Dependencies for the Vercel Python function (api/index.py).
+# Mirrors backend/requirements.txt plus the bot, which serves the webhook route.
+fastapi==0.129.2
+pydantic==2.13.4
+pydantic-settings==2.15.0
+SQLAlchemy[asyncio]==2.0.52
+alembic==1.19.1
+asyncpg==0.31.0
+redis==8.1.0
+httpx==0.28.1
+aiogram==3.30.0
+PyJWT==2.13.0
+PyNaCl==1.6.2
+python-multipart==0.0.32
+orjson==3.12.0

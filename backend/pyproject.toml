@@ -1,0 +1,25 @@
+[project]
+name = "gg-gram-backend"
+version = "1.0.0"
+description = "gg.gram backend — FastAPI, PostgreSQL, Redis"
+requires-python = ">=3.11"
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+exclude = [".venv", "alembic/versions"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "C4", "SIM", "RUF"]
+ignore = [
+    "B008",   # FastAPI dependencies are function calls in defaults by design
+    "RUF012", # mutable class attrs are fine for pydantic/SQLAlchemy models
+    "RUF002", # prose in docstrings uses en dashes on purpose
+    "RUF003",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["E501"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app", "gg_shared", "gg_bot"]

@@ -1,0 +1,26 @@
+# python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# node
+node_modules/
+dist/
+.vite/
+
+# env & secrets — never commit real credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# tooling
+.vercel/
+.DS_Store
+*.log
+coverage/
