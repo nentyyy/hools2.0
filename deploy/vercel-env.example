@@ -1,24 +1,35 @@
-# Environment variables to set in the Vercel project
-# (Project → Settings → Environment Variables). Everything here is server-side
+# Environment variables for the Vercel project
+# (Project -> Settings -> Environment Variables). Everything here is server-side
 # except the VITE_* entries, which are baked into the public bundle.
+#
+# DATABASE_URL and REDIS_URL can be left out entirely if you add Neon and
+# Upstash from the Vercel marketplace: the backend also reads POSTGRES_URL,
+# POSTGRES_PRISMA_URL, KV_URL and UPSTASH_REDIS_URL.
+#
+# The secrets below were generated for this checkout — replace them if this file
+# has ever been shared.
 
 BOT_TOKEN=
 BOT_USERNAME=
-WEBAPP_URL=https://<your-project>.vercel.app
-TELEGRAM_WEBHOOK_SECRET=
-DATABASE_URL=postgresql://user:password@host/db?sslmode=require
-DB_STATEMENT_CACHE_SIZE=0
-REDIS_URL=rediss://default:password@host:6379
-JWT_SECRET=
-INTERNAL_API_TOKEN=
-CRON_SECRET=
+# May be left empty on the first deploy: the backend falls back to VERCEL_URL.
+WEBAPP_URL=
+TELEGRAM_WEBHOOK_SECRET=hokz7yRahYzNRHJOABNeKaLkIbFjXKML
+JWT_SECRET=mVoLqq1noVLFzIz4FCM1PJj5bDk2NfWXjYJERjPRVx1dE7e3
+INTERNAL_API_TOKEN=GrJvJRX8C5pjRk5ukDGNVHYkT60to015
+CRON_SECRET=g7Yd7v6uWLnHuawgplwOaYyGRocnz4sW
 ADMIN_TELEGRAM_IDS=
+
+DATABASE_URL=
+REDIS_URL=
+
 ENVIRONMENT=production
 ENABLE_SCHEDULER=0
-CORS_ORIGINS=https://<your-project>.vercel.app
-TON_MANIFEST_URL=https://<your-project>.vercel.app/tonconnect-manifest.json
+CORS_ORIGINS=*
+
+TON_MANIFEST_URL=
 TON_RECEIVER_ADDRESS=
 
+# Empty means "same origin", which is correct for this single-project setup.
 VITE_API_URL=
-VITE_TON_MANIFEST_URL=https://<your-project>.vercel.app/tonconnect-manifest.json
+VITE_TON_MANIFEST_URL=
 VITE_BOT_USERNAME=

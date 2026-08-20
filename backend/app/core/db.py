@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import ssl
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -19,12 +20,20 @@ logger = logging.getLogger(__name__)
 
 
 def _connect_args() -> dict:
+    options = settings.database_options
     args: dict = {"server_settings": {"application_name": "gg.gram"}}
-    # Neon / Supabase / pgbouncer in transaction mode cannot use prepared
-    # statements, so the cache has to be disabled there (set the env to 0).
-    if settings.db_statement_cache_size == 0:
+
+    # A transaction-mode pooler (Neon, Supabase, pgbouncer) hands each query to
+    # a different backend, so prepared statements must be switched off.
+    if options.statement_cache_size == 0:
         args["statement_cache_size"] = 0
         args["prepared_statement_cache_size"] = 0
+
+    # `?sslmode=require` is libpq syntax; asyncpg wants an SSL context instead.
+    if options.ssl_required:
+        context = ssl.create_default_context()
+        args["ssl"] = context
+
     return args
 
 

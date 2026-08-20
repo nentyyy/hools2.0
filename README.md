@@ -169,6 +169,43 @@ an nginx-served frontend on `:5173`.
 Frontend, API and the bot webhook run from one project — `vercel.json` builds
 `frontend/` and routes `/api/*` to `api/index.py`.
 
+### From a phone, with nothing but a browser
+
+No terminal is needed: the two steps that normally require one — migrations and
+the Telegram webhook — are exposed as one guarded URL.
+
+1. **Database and Redis.** In the Vercel dashboard open the project's *Storage*
+   tab and add **Neon** (Postgres) and **Upstash** (Redis) from the marketplace.
+   Both inject their connection strings automatically, under whatever names they
+   choose; the backend recognises `DATABASE_URL`, `POSTGRES_URL`, `REDIS_URL`
+   and `KV_URL` alike, translates the `?sslmode=require` style parameters
+   asyncpg cannot read, and turns off prepared statements when the host is a
+   pooler.
+2. **Import the repo.** *Add New → Project* → pick this repository. Framework
+   preset *Other*, root directory left at the repository root — `vercel.json`
+   describes the rest. If the code is not on the default branch, set
+   *Settings → Git → Production Branch* to the branch you want deployed.
+3. **Environment variables.** Paste the block from
+   `deploy/vercel-env.example`. `WEBAPP_URL` may be left empty on the first
+   deploy — the backend falls back to the deployment's own URL.
+4. **Deploy**, then open once in the browser:
+
+   ```
+   https://<your-deployment>/api/internal/setup?token=<CRON_SECRET>
+   ```
+
+   That applies the migrations, points Telegram's webhook at the deployment and
+   registers the bot's command list, reporting each step separately. It is
+   idempotent, so opening it again is harmless — and it answers with the exact
+   URL to paste into BotFather.
+5. **BotFather** → `/newapp` → pick the bot → Web App URL = the deployment URL.
+   Send `/start` to the bot; the button opens the Mini App.
+
+Rotate `CRON_SECRET` afterwards if you would rather that URL stopped working;
+nothing else depends on it except the daily cron.
+
+### From a machine with a terminal
+
 You need a managed PostgreSQL (Neon, Supabase) and Redis (Upstash) first —
 Vercel provides neither.
 

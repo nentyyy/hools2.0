@@ -8,7 +8,7 @@ import json
 import logging
 from typing import Annotated, Any
 
-from fastapi import Depends, Header, Request
+from fastapi import Depends, Header, Query, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -81,11 +81,19 @@ async def require_internal_token(
 async def require_cron_token(
     x_cron_token: Annotated[str | None, Header(alias="X-Cron-Token")] = None,
     authorization: Annotated[str | None, Header()] = None,
+    token: Annotated[str | None, Query(description="Alternative to the X-Cron-Token header")] = None,
 ) -> bool:
-    """Guards the scheduler endpoint (Vercel Cron sends a bearer header)."""
+    """Guards the scheduler and setup endpoints.
+
+    Accepts the header, a bearer token (that is what Vercel Cron sends) or a
+    `?token=` query parameter, because a phone browser cannot set headers and
+    these endpoints have to be reachable from one during setup.
+    """
     candidate = x_cron_token or ""
     if not candidate and authorization and authorization.lower().startswith("bearer "):
         candidate = authorization[7:]
+    if not candidate and token:
+        candidate = token
     if not settings.cron_secret or not constant_time_equals(candidate, settings.cron_secret):
         raise AuthError("Invalid cron token")
     return True
@@ -122,6 +130,8 @@ class RateLimiter:
 
 
 default_limit = RateLimiter(settings.rate_limit_default, scope="api")
+# Deliberately tight: this one is reachable with a token in the URL.
+setup_limit = RateLimiter("10/60", scope="setup")
 play_limit = RateLimiter(settings.rate_limit_play, scope="play")
 auth_limit = RateLimiter(settings.rate_limit_auth, scope="auth")
 

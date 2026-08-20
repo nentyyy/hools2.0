@@ -94,3 +94,11 @@ async def test_cron_tick_requires_the_secret(client):
     ok = await client.post("/api/internal/tick", headers={"X-Cron-Token": "test-cron"})
     assert ok.status_code == 200
     assert ok.json()["ok"] is True
+
+
+async def test_setup_endpoints_require_the_secret(client):
+    """The setup URL carries its token in the query string, so it must be strict."""
+    for path in ("/api/internal/migrate", "/api/internal/setup"):
+        assert (await client.get(path)).status_code == 401
+        assert (await client.get(f"{path}?token=wrong")).status_code == 401
+        assert (await client.post(path, headers={"X-Cron-Token": "nope"})).status_code == 401
