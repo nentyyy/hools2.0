@@ -45,6 +45,17 @@ def _response(game: SoloGame, balance: int, state: dict | None = None) -> dict:
     }
 
 
+@router.get("/shop", dependencies=[Depends(default_limit)])
+async def shop(chance: float = 0.05) -> dict:
+    """Every gift Lucky Buy can be played for, priced at a sample chance."""
+    return {
+        "gifts": lucky_buy.catalogue(lucky_buy.validate_chance(chance)),
+        "min_chance": lucky_buy.MIN_CHANCE,
+        "max_chance": lucky_buy.MAX_CHANCE,
+        "house_edge": settings.house_edge,
+    }
+
+
 @router.get("/config", dependencies=[Depends(default_limit)])
 async def config() -> dict:
     """Everything the client needs to render odds without guessing at them."""
@@ -69,15 +80,9 @@ async def config() -> dict:
             ],
         },
         "lucky_buy": {
-            "cases": [
-                {
-                    "code": case.code,
-                    "title": case.title,
-                    "price": case.price,
-                    "items": lucky_buy.case_odds(case),
-                }
-                for case in lucky_buy.CASES
-            ]
+            "min_chance": lucky_buy.MIN_CHANCE,
+            "max_chance": lucky_buy.MAX_CHANCE,
+            "gifts": lucky_buy.catalogue(),
         },
         "hi_lo": {"max_rounds": hilo.MAX_ROUNDS, "choices": list(hilo.CHOICES)},
         "ice_arena": {
@@ -155,20 +160,29 @@ async def play_lucky_buy(
         return guard.cached
     try:
         player, game, item = await lucky_buy.play(
-            session, user.id, case_code=payload.case, idempotency_key=guard.key
+            session,
+            user.id,
+            gift_code=payload.gift,
+            chance=payload.chance,
+            idempotency_key=guard.key,
         )
         await session.commit()
     except Exception:
         await guard.fail()
         raise
+
     response = _response(game, int(player.balance))
-    response["item"] = {
-        "id": item.id,
-        "name": item.name,
-        "rarity": item.rarity,
-        "gg_value": int(item.gg_value),
-        "code": item.item_code,
-    }
+    response["item"] = (
+        {
+            "id": item.id,
+            "name": item.name,
+            "rarity": item.rarity,
+            "gg_value": int(item.gg_value),
+            "code": item.item_code,
+        }
+        if item
+        else None
+    )
     return await guard.finish(response)
 
 

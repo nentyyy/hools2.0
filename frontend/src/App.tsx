@@ -11,9 +11,10 @@ import { ProfilePage } from "@/pages/Profile";
 import { PvpHistoryPage } from "@/pages/PvpHistory";
 import { PvpRoomPage } from "@/pages/PvpRoom";
 import { SoloPage } from "@/pages/Solo";
+import { LuckyBuyPage } from "@/pages/LuckyBuy";
+import { ShopPage } from "@/pages/Shop";
 import { HiLoPage } from "@/pages/solo/HiLo";
 import { IceArenaPage } from "@/pages/solo/IceArena";
-import { LuckyBuyPage } from "@/pages/solo/LuckyBuy";
 import { PlinkoPage } from "@/pages/solo/Plinko";
 import { UpgradePage } from "@/pages/solo/Upgrade";
 
@@ -67,7 +68,8 @@ export default function App() {
           <Route path="/solo" element={<SoloPage />} />
           <Route path="/solo/plinko" element={<PlinkoPage />} />
           <Route path="/solo/upgrade" element={<UpgradePage />} />
-          <Route path="/solo/lucky-buy" element={<LuckyBuyPage />} />
+          <Route path="/shop" element={<ShopPage />} />
+          <Route path="/shop/:code" element={<LuckyBuyPage />} />
           <Route path="/solo/hi-lo" element={<HiLoPage />} />
           <Route path="/solo/ice-arena" element={<IceArenaPage />} />
           <Route path="/giveaways" element={<GiveawaysPage />} />

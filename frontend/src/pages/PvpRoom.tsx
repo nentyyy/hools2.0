@@ -17,10 +17,9 @@ import { api, newIdempotencyKey } from "@/lib/api";
 import { gg, percent } from "@/lib/format";
 import { useSession } from "@/lib/session";
 import { haptics } from "@/lib/telegram";
+import { PLAYER_COLORS } from "@/lib/theme";
 import { useToast } from "@/lib/toast";
 import { useCountdown, usePvpChannel } from "@/lib/usePvpChannel";
-
-const PLAYER_COLORS = ["#55c8ff", "#6ff0ad", "#ffc93f", "#a98bff", "#ff6470", "#5ad1a4"];
 
 export function PvpRoomPage() {
   const params = useParams<{ id: string }>();

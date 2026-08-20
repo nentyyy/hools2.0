@@ -16,21 +16,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { PvPPlayer } from "@shared/index";
 
 import { initials } from "@/lib/format";
+import { PLAYER_COLORS } from "@/lib/theme";
 
-export const PLAYER_COLORS = [
-  "#55c8ff",
-  "#6ff0ad",
-  "#ffc93f",
-  "#a98bff",
-  "#ff6470",
-  "#5ad1a4",
-  "#ff9f43",
-  "#4dd0e1",
-  "#f06292",
-  "#9ccc65",
-  "#7986cb",
-  "#ffb74d",
-];
+export { PLAYER_COLORS };
 
 const SIZE = 300;
 const CENTER = SIZE / 2;

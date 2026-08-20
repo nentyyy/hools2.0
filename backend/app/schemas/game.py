@@ -100,7 +100,10 @@ class UpgradePlayRequest(BaseModel):
 
 
 class LuckyBuyPlayRequest(BaseModel):
-    case: str = Field(min_length=1, max_length=32)
+    """Play for one specific gift at the odds the player picked."""
+
+    gift: str = Field(min_length=1, max_length=32)
+    chance: float = Field(ge=0.01, le=0.9)
 
 
 class HiLoPlayRequest(BaseModel):

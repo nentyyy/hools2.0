@@ -66,33 +66,65 @@ async def test_upgrade_odds_match_the_declared_chance(client):
     assert response.json()["game"]["reward"] == (250 if result["won"] else 0)
 
 
-async def test_lucky_buy_drops_an_item_that_can_be_sold(client):
+async def test_lucky_buy_pays_the_chosen_odds(client):
+    """Lucky Buy is a bet on one gift at the odds the player picked."""
     headers, _ = await _login(client, 6005)
-    response = await client.post("/api/solo/lucky-buy/play", json={"case": "frost"}, headers=headers)
+
+    shop = (await client.get("/api/solo/shop", headers=headers)).json()
+    gift = next(g for g in shop["gifts"] if g["code"] == "rose")
+
+    before = (await client.get("/api/balance", headers=headers)).json()["balance"]
+    response = await client.post(
+        "/api/solo/lucky-buy/play", json={"gift": "rose", "chance": 0.5}, headers=headers
+    )
     assert response.status_code == 200, response.text
-    item = response.json()["item"]
+    body = response.json()
+    result = body["game"]["result"]
 
-    inventory = (await client.get("/api/inventory", headers=headers)).json()
-    assert any(i["id"] == item["id"] for i in inventory["items"])
+    # stake = value * chance / (1 - edge), rounded up.
+    expected_stake = -(-int(gift["gg_value"] * 0.5 * 100) // int(0.96 * 100))
+    assert result["stake"] == pytest.approx(expected_stake, abs=1)
+    assert body["game"]["bet"] == result["stake"]
+    assert result["won"] == (result["roll"] < 0.5)
+    assert body["balance"] == before - result["stake"]
 
-    sold = await client.post(
-        f"/api/inventory/{item['id']}/sell", headers={**headers, "X-Idempotency-Key": "sell-1"}
+    if result["won"]:
+        item = body["item"]
+        assert item["gg_value"] == gift["gg_value"]
+        inventory = (await client.get("/api/inventory", headers=headers)).json()
+        assert any(entry["id"] == item["id"] for entry in inventory["items"])
+
+        sold = await client.post(
+            f"/api/inventory/{item['id']}/sell", headers={**headers, "X-Idempotency-Key": "sell-gift"}
+        )
+        assert sold.status_code == 200
+        assert sold.json()["payout"] == gift["gg_value"]
+    else:
+        assert body["item"] is None
+        assert body["game"]["reward"] == 0
+
+
+async def test_lucky_buy_rejects_impossible_odds(client):
+    headers, _ = await _login(client, 6012)
+    for chance in (0, 0.999, 1.5):
+        response = await client.post(
+            "/api/solo/lucky-buy/play", json={"gift": "rose", "chance": chance}, headers=headers
+        )
+        assert response.status_code == 422
+
+    unknown = await client.post(
+        "/api/solo/lucky-buy/play", json={"gift": "not-a-gift", "chance": 0.1}, headers=headers
     )
-    assert sold.status_code == 200
-    assert sold.json()["payout"] == item["gg_value"]
+    assert unknown.status_code == 422
 
-    # Replaying the same key returns the first response instead of paying again.
-    replay = await client.post(
-        f"/api/inventory/{item['id']}/sell", headers={**headers, "X-Idempotency-Key": "sell-1"}
-    )
-    assert replay.status_code == 200
-    assert replay.json() == sold.json()
 
-    # A genuinely new request cannot sell the item a second time.
-    again = await client.post(
-        f"/api/inventory/{item['id']}/sell", headers={**headers, "X-Idempotency-Key": "sell-2"}
-    )
-    assert again.status_code == 409
+async def test_lucky_buy_price_scales_with_the_chance(client):
+    headers, _ = await _login(client, 6013)
+    shop = (await client.get("/api/solo/shop?chance=0.1", headers=headers)).json()
+    ring = next(g for g in shop["gifts"] if g["code"] == "ring")
+    # 10% of a 3500 GG gift, plus the house edge.
+    assert ring["sample_stake"] == 365
+    assert shop["house_edge"] == 0.04
 
 
 async def test_hilo_round_trip(client):

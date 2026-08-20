@@ -40,7 +40,7 @@ def games_menu() -> InlineKeyboardMarkup:
     modes = [
         ("🟣 Plinko", "/solo/plinko"),
         ("🔺 Upgrade", "/solo/upgrade"),
-        ("🎁 Lucky Buy", "/solo/lucky-buy"),
+        ("🎁 Lucky Buy", "/shop"),
         ("🃏 Hi-Lo", "/solo/hi-lo"),
         ("🧊 Ice Arena", "/solo/ice-arena"),
     ]

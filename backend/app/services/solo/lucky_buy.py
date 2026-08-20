@@ -1,109 +1,67 @@
-"""LUCKY BUY — open a case and receive an item.
+"""LUCKY BUY — buy a chance at one specific gift.
 
-Item values are expressed as multiples of the case price and normalised so that
-the expected value of a case is exactly `price * (1 - house_edge)`. The item
-lands in the inventory; selling it is what turns it into GG.
+You choose the gift and the odds; the stake follows from both:
+
+    stake = gift value * chance / (1 - house_edge)
+
+so the expected return is `1 - house_edge` at every setting, and the only thing
+the slider changes is variance. Win and the gift lands in your inventory, where
+it can be kept or sold for its value. Lose and the stake is gone.
+
+The roll comes from the provably-fair stream, so a player can recompute any past
+attempt once the seed is revealed.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+import math
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core import rng
 from app.core.errors import ValidationError
 from app.models import InventoryItem, SoloGame, User
 from app.services import inventory
 from app.services.solo import engine
-from gg_shared import ItemRarity, SoloGameType, SoloStatus
+from gg_shared import GIFTS, Gift, SoloGameType, SoloStatus, find_gift
+
+MIN_CHANCE = 0.01
+MAX_CHANCE = 0.90
 
 
-@dataclass(frozen=True, slots=True)
-class CaseItem:
-    code: str
-    name: str
-    rarity: ItemRarity
-    value: float  # multiple of the case price, before normalisation
-    weight: float
+def get_gift(code: str) -> Gift:
+    gift = find_gift(code)
+    if gift is None:
+        raise ValidationError(f"Unknown gift: {code}")
+    return gift
 
 
-@dataclass(frozen=True, slots=True)
-class Case:
-    code: str
-    title: str
-    price: int
-    items: tuple[CaseItem, ...]
+def validate_chance(chance: float) -> float:
+    chance = round(float(chance), 4)
+    if not (MIN_CHANCE <= chance <= MAX_CHANCE):
+        raise ValidationError(f"chance must be between {MIN_CHANCE} and {MAX_CHANCE}")
+    return chance
 
 
-CASES: tuple[Case, ...] = (
-    Case(
-        code="frost",
-        title="Frost Case",
-        price=100,
-        items=(
-            CaseItem("ice_shard", "Ice Shard", ItemRarity.COMMON, 0.2, 46),
-            CaseItem("frost_charm", "Frost Charm", ItemRarity.UNCOMMON, 0.8, 30),
-            CaseItem("glacier_core", "Glacier Core", ItemRarity.RARE, 2.0, 16),
-            CaseItem("winter_crown", "Winter Crown", ItemRarity.EPIC, 6.0, 6.5),
-            CaseItem("absolute_zero", "Absolute Zero", ItemRarity.LEGENDARY, 25.0, 1.5),
-        ),
-    ),
-    Case(
-        code="neon",
-        title="Neon Case",
-        price=500,
-        items=(
-            CaseItem("neon_chip", "Neon Chip", ItemRarity.COMMON, 0.25, 44),
-            CaseItem("pulse_blade", "Pulse Blade", ItemRarity.UNCOMMON, 0.9, 31),
-            CaseItem("grid_runner", "Grid Runner", ItemRarity.RARE, 2.4, 17),
-            CaseItem("hyper_visor", "Hyper Visor", ItemRarity.EPIC, 7.0, 6),
-            CaseItem("singularity", "Singularity", ItemRarity.LEGENDARY, 40.0, 2),
-        ),
-    ),
-    Case(
-        code="vault",
-        title="Vault Case",
-        price=2000,
-        items=(
-            CaseItem("token_stack", "Token Stack", ItemRarity.COMMON, 0.3, 42),
-            CaseItem("gold_ingot", "Gold Ingot", ItemRarity.UNCOMMON, 1.0, 32),
-            CaseItem("black_card", "Black Card", ItemRarity.RARE, 2.6, 18),
-            CaseItem("vault_key", "Vault Key", ItemRarity.EPIC, 8.0, 6),
-            CaseItem("jackpot_core", "Jackpot Core", ItemRarity.LEGENDARY, 60.0, 2),
-        ),
-    ),
-)
+def stake_for(gift: Gift, chance: float) -> int:
+    """What a given chance at this gift costs, rounded up in the house's favour."""
+    return max(1, math.ceil(gift.gg_value * chance / engine.payout_factor()))
 
 
-def get_case(code: str) -> Case:
-    case = next((c for c in CASES if c.code == code), None)
-    if case is None:
-        raise ValidationError(f"Unknown case: {code}")
-    return case
-
-
-def normalised_values(case: Case) -> list[float]:
-    """Scale the raw item values so the case returns `payout_factor()` on average."""
-    weights = [item.weight for item in case.items]
-    total_weight = sum(weights)
-    expected = sum(item.value * item.weight for item in case.items) / total_weight
-    scale = engine.payout_factor() / expected
-    return [round(item.value * scale, 4) for item in case.items]
-
-
-def case_odds(case: Case) -> list[dict]:
-    total_weight = sum(item.weight for item in case.items)
-    values = normalised_values(case)
+def catalogue(chance: float = 0.05) -> list[dict]:
+    """Shop listing, priced at a sample chance so cards can show a starting price."""
     return [
         {
-            "code": item.code,
-            "name": item.name,
-            "rarity": item.rarity.value,
-            "chance": round(item.weight / total_weight, 6),
-            "gg_value": round(case.price * value),
+            "code": gift.code,
+            "name": gift.name,
+            "rarity": gift.rarity.value,
+            "glyph": gift.glyph,
+            "gg_value": gift.gg_value,
+            "min_chance": MIN_CHANCE,
+            "max_chance": MAX_CHANCE,
+            "sample_chance": chance,
+            "sample_stake": stake_for(gift, chance),
         }
-        for item, value in zip(case.items, values, strict=True)
+        for gift in GIFTS
     ]
 
 
@@ -111,62 +69,65 @@ async def play(
     session: AsyncSession,
     user_id: int,
     *,
-    case_code: str,
+    gift_code: str,
+    chance: float,
     idempotency_key: str | None = None,
-) -> tuple[User, SoloGame, InventoryItem]:
-    case = get_case(case_code)
+) -> tuple[User, SoloGame, InventoryItem | None]:
+    gift = get_gift(gift_code)
+    chance = validate_chance(chance)
+    stake = stake_for(gift, chance)
 
     user, game, seed = await engine.begin(
         session,
         user_id,
         SoloGameType.LUCKY_BUY,
-        case.price,
+        stake,
         idempotency_key=idempotency_key,
-        state={"case": case.code},
+        state={"gift": gift.code, "chance": chance},
     )
 
     roll = engine.round_rolls(seed.server_seed, game, 0, 1)[0]
-    index = rng.weighted_pick(
-        [i.value for i in case.items], [i.weight for i in case.items], roll
-    )
-    won = case.items[index]
-    value = round(case.price * normalised_values(case)[index])
+    won = roll < chance
 
-    item = await inventory.add_item(
-        session,
-        user_id,
-        item_type="case_drop",
-        item_code=won.code,
-        name=won.name,
-        rarity=won.rarity,
-        gg_value=value,
-        source=f"lucky_buy:{game.id}",
-        extra={"case": case.code},
-    )
+    item: InventoryItem | None = None
+    if won:
+        item = await inventory.add_item(
+            session,
+            user_id,
+            item_type="gift",
+            item_code=gift.code,
+            name=gift.name,
+            rarity=gift.rarity,
+            gg_value=gift.gg_value,
+            source=f"lucky_buy:{game.id}",
+            extra={"glyph": gift.glyph, "chance": chance},
+        )
 
-    # The prize is the item, not GG: it is credited when the player sells it.
+    # The prize is the gift itself; selling it is what turns it into GG.
     await engine.finish(
         session,
         user,
         game,
-        reward=value,
-        multiplier=value / case.price if case.price else 0.0,
+        reward=gift.gg_value if won else 0,
+        multiplier=gift.gg_value / stake if won and stake else 0.0,
         result={
-            "case": case.code,
-            "item": {
-                "id": item.id,
-                "code": won.code,
-                "name": won.name,
-                "rarity": won.rarity.value,
-                "gg_value": value,
+            "gift": {
+                "code": gift.code,
+                "name": gift.name,
+                "rarity": gift.rarity.value,
+                "glyph": gift.glyph,
+                "gg_value": gift.gg_value,
             },
+            "chance": chance,
+            "stake": stake,
             "roll": round(roll, 6),
-            "odds": case_odds(case),
+            "won": won,
+            "item_id": item.id if item else None,
         },
         status=SoloStatus.FINISHED,
         credit=False,
         reveal_seed=seed.server_seed,
     )
-    if value > case.price:
+    if won:
         user.solo_wins += 1
     return user, game, item

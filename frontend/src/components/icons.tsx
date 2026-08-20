@@ -75,3 +75,13 @@ export function UsersIcon(props: IconProps) {
     </Svg>
   );
 }
+
+
+export function BagIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path {...stroke} d="M4.2 8.5h15.6l-1.1 10.2a1.6 1.6 0 0 1-1.6 1.4H6.9a1.6 1.6 0 0 1-1.6-1.4z" />
+      <path {...stroke} d="M8.6 8.5V7a3.4 3.4 0 0 1 6.8 0v1.5" />
+    </Svg>
+  );
+}

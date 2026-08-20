@@ -80,8 +80,8 @@ export function initTelegram(): void {
 
   app.ready();
   app.expand();
-  app.setHeaderColor?.("#07090d");
-  app.setBackgroundColor?.("#07090d");
+  app.setHeaderColor?.("#0a0908");
+  app.setBackgroundColor?.("#0a0908");
   // Stops a downward drag inside a game from closing the app mid-round.
   app.disableVerticalSwipes?.();
 }
@@ -156,8 +156,8 @@ export const mainButton = {
 
     app.MainButton.setParams({
       text,
-      color: "#55c8ff",
-      text_color: "#04121c",
+      color: "#ddc9a3",
+      text_color: "#17130d",
       is_active: !options?.disabled,
       is_visible: true,
     });

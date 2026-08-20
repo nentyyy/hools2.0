@@ -187,7 +187,6 @@ export const RARITY_ORDER: ItemRarity[] = ["common", "uncommon", "rare", "epic",
 export const SOLO_MODES: { type: SoloGameType; slug: string; title: string; blurb: string }[] = [
   { type: "plinko", slug: "plinko", title: "Plinko", blurb: "Drop the ball, chase the edges" },
   { type: "upgrade", slug: "upgrade", title: "Upgrade", blurb: "Pick a multiplier, take the odds" },
-  { type: "lucky_buy", slug: "lucky-buy", title: "Lucky Buy", blurb: "Open a case, keep the drop" },
   { type: "hi_lo", slug: "hi-lo", title: "Hi-Lo", blurb: "Higher or lower, stack the streak" },
   { type: "ice_arena", slug: "ice-arena", title: "Ice Arena", blurb: "Cross the ice, cash out in time" },
 ];

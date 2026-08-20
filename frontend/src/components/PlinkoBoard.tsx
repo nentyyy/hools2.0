@@ -10,6 +10,8 @@
 
 import { useEffect, useRef } from "react";
 
+import { cssVar } from "@/lib/theme";
+
 interface Props {
   rows: number;
   multipliers: number[];
@@ -20,18 +22,20 @@ interface Props {
 }
 
 const ROW_MS = 105;
-const COLORS = {
-  peg: "rgba(255,255,255,0.22)",
-  pegLit: "#55c8ff",
-  ball: "#55c8ff",
-  slotText: "#97a1b3",
-};
+
+const palette = () => ({
+  peg: "rgba(233, 219, 197, 0.2)",
+  pegLit: cssVar("--accent", "#ddc9a3"),
+  ball: cssVar("--accent", "#ddc9a3"),
+  slotText: cssVar("--text-dim", "#a99d8a"),
+  ink: cssVar("--ink", "#0a0908"),
+});
 
 function multiplierColor(value: number): string {
-  if (value >= 5) return "#ff6470";
-  if (value >= 2) return "#ffc93f";
-  if (value >= 1) return "#6ff0ad";
-  return "#2a3442";
+  if (value >= 5) return cssVar("--lose", "#d08a76");
+  if (value >= 2) return cssVar("--star", "#e8c66b");
+  if (value >= 1) return cssVar("--win", "#b8cf9a");
+  return cssVar("--surface-3", "#29241e");
 }
 
 export function PlinkoBoard({ rows, multipliers, path, slot, playId, onLanded }: Props) {
@@ -45,6 +49,7 @@ export function PlinkoBoard({ rows, multipliers, path, slot, playId, onLanded }:
     const context = canvas.getContext("2d");
     if (!context) return;
 
+    const COLORS = palette();
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     const width = canvas.clientWidth;
     const height = canvas.clientHeight;
@@ -113,7 +118,7 @@ export function PlinkoBoard({ rows, multipliers, path, slot, playId, onLanded }:
         const lift = active ? 3 : 0;
         context.beginPath();
         context.roundRect(x + 1.5, y - lift, slotWidth - 3, slotsHeight - 2 + lift, 6);
-        context.fillStyle = active ? multiplierColor(value) : "rgba(255,255,255,0.05)";
+        context.fillStyle = active ? multiplierColor(value) : "rgba(233, 219, 197, 0.06)";
         if (active) {
           context.shadowColor = multiplierColor(value);
           context.shadowBlur = 14;
@@ -121,7 +126,7 @@ export function PlinkoBoard({ rows, multipliers, path, slot, playId, onLanded }:
         context.fill();
         context.shadowBlur = 0;
 
-        context.fillStyle = active ? "#07090d" : COLORS.slotText;
+        context.fillStyle = active ? COLORS.ink : COLORS.slotText;
         context.font = `${active ? 700 : 600} ${multipliers.length > 13 ? 8 : 9.5}px -apple-system, system-ui, sans-serif`;
         context.textAlign = "center";
         context.textBaseline = "middle";

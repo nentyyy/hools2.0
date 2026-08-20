@@ -18,8 +18,7 @@ import { useEffect, useMemo, useRef } from "react";
 import type { PvPPlayer } from "@shared/index";
 
 import { initials } from "@/lib/format";
-
-import { PLAYER_COLORS } from "./Wheel";
+import { PLAYER_COLORS, cssVar } from "@/lib/theme";
 
 interface Props {
   players: PvPPlayer[];
@@ -197,9 +196,9 @@ export function IceRink({ players, totalPool, winningRoll, spinAt, spinSeconds, 
       // Boards.
       context.beginPath();
       context.roundRect(2, 2, WIDTH - 4, HEIGHT - 4, 16);
-      context.fillStyle = "#0b1017";
+      context.fillStyle = cssVar("--surface-1", "#141210");
       context.fill();
-      context.strokeStyle = "rgba(255,255,255,0.14)";
+      context.strokeStyle = "rgba(233, 219, 197, 0.16)";
       context.lineWidth = 3;
       context.stroke();
 
@@ -219,7 +218,7 @@ export function IceRink({ players, totalPool, winningRoll, spinAt, spinSeconds, 
         context.globalAlpha = 1;
 
         // Ice scratches.
-        context.strokeStyle = "rgba(255,255,255,0.10)";
+        context.strokeStyle = "rgba(233, 219, 197, 0.10)";
         context.lineWidth = 1;
         for (let line = 0; line < 4; line += 1) {
           const y = region.y + ((line + 1) * region.h) / 5;
@@ -234,12 +233,12 @@ export function IceRink({ players, totalPool, winningRoll, spinAt, spinSeconds, 
         context.beginPath();
         context.roundRect(region.x, region.y, region.w, region.h, 10);
         if (region.player.is_winner) {
-          context.strokeStyle = "rgba(255,255,255,0.9)";
+          context.strokeStyle = "rgba(244, 239, 230, 0.92)";
           context.lineWidth = 3;
           context.shadowColor = region.color;
           context.shadowBlur = 18;
         } else {
-          context.strokeStyle = "rgba(7,9,13,0.85)";
+          context.strokeStyle = "rgba(10, 9, 8, 0.85)";
           context.lineWidth = 2;
         }
         context.stroke();
@@ -256,14 +255,14 @@ export function IceRink({ players, totalPool, winningRoll, spinAt, spinSeconds, 
         context.beginPath();
         context.arc(cx, cy, radius, 0, Math.PI * 2);
         context.closePath();
-        context.fillStyle = "rgba(7,9,13,0.72)";
+        context.fillStyle = "rgba(10, 9, 8, 0.72)";
         context.fill();
         context.clip();
         if (image) context.drawImage(image, cx - radius, cy - radius, radius * 2, radius * 2);
         context.restore();
 
         if (!image) {
-          context.fillStyle = "rgba(255,255,255,0.92)";
+          context.fillStyle = "rgba(244, 239, 230, 0.92)";
           context.font = `700 ${Math.round(radius * 0.9)}px -apple-system, system-ui, sans-serif`;
           context.textAlign = "center";
           context.textBaseline = "middle";
@@ -272,13 +271,13 @@ export function IceRink({ players, totalPool, winningRoll, spinAt, spinSeconds, 
 
         context.beginPath();
         context.arc(cx, cy, radius, 0, Math.PI * 2);
-        context.strokeStyle = "rgba(255,255,255,0.55)";
+        context.strokeStyle = "rgba(244, 239, 230, 0.55)";
         context.lineWidth = 2;
         context.stroke();
 
         // Share, when the block is big enough to read.
         if (region.h > 54 && region.w > 54) {
-          context.fillStyle = "rgba(7,9,13,0.85)";
+          context.fillStyle = "rgba(10, 9, 8, 0.85)";
           context.font = "700 11px -apple-system, system-ui, sans-serif";
           context.textAlign = "center";
           context.fillText(`${Math.round(region.player.chance * 100)}%`, cx, cy + radius + 12);
@@ -298,14 +297,14 @@ export function IceRink({ players, totalPool, winningRoll, spinAt, spinSeconds, 
           const ghost = trail[Math.max(0, index - back * 4)];
           context.beginPath();
           context.arc(ghost.x, ghost.y, PUCK - back, 0, Math.PI * 2);
-          context.fillStyle = `rgba(233,237,245,${0.05 * (7 - back)})`;
+          context.fillStyle = `rgba(244, 239, 230, ${0.05 * (7 - back)})`;
           context.fill();
         }
 
         context.beginPath();
         context.arc(puck.x, puck.y, PUCK, 0, Math.PI * 2);
-        context.fillStyle = "#f2f6ff";
-        context.shadowColor = "rgba(85,200,255,0.95)";
+        context.fillStyle = cssVar("--text", "#f4efe6");
+        context.shadowColor = "rgba(221, 201, 163, 0.95)";
         context.shadowBlur = 18;
         context.fill();
         context.shadowBlur = 0;

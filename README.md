@@ -312,7 +312,7 @@ on, anyone holding the URL can mint accounts and collect the signup bonus.
 | PvP | `POST /api/pvp/create`, `/api/pvp/{id}/join` | pot game — your share of the pot is your chance; 5% rake |
 | Plinko | `POST /api/solo/plinko/play` | binomial slots, multipliers normalised to the configured edge |
 | Upgrade | `POST /api/solo/upgrade/play` | pick a target, win chance is `(1 − edge) / target` |
-| Lucky Buy | `POST /api/solo/lucky-buy/play` | weighted case, drop lands in the inventory |
+| Lucky Buy | `POST /api/solo/lucky-buy/play` | pick a gift and your odds; stake = value × chance ÷ (1 − edge) |
 | Hi-Lo | `POST /api/solo/hilo/play` | 13-rank deck, exact per-guess odds, cash out any time |
 | Ice Arena | `POST /api/solo/ice-arena/play` | round-based run, per-tile difficulty, full history |
 
@@ -373,7 +373,7 @@ Auth & profile: `POST /api/auth/telegram`, `GET /api/me`, `/api/balance`,
 PvP: `GET /api/pvp`, `POST /api/pvp/create`, `POST /api/pvp/{id}/join`,
 `GET /api/pvp/{id}`, `GET /api/pvp/{id}/state`.
 
-Solo: `GET /api/solo/config`, `/api/solo/active`, `/api/solo/history`, and
+Solo: `GET /api/solo/config`, `/api/solo/shop`, `/api/solo/active`, `/api/solo/history`, and
 `POST /api/solo/{plinko|upgrade|lucky-buy|hilo|ice-arena}/play`.
 
 Giveaways: `GET /api/giveaways`, `/api/giveaways/{id}`,

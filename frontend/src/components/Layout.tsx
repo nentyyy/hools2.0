@@ -7,12 +7,11 @@ import { gg } from "@/lib/format";
 import { useSession } from "@/lib/session";
 import { backButton, haptics } from "@/lib/telegram";
 
-import { DiceIcon, GiftIcon, SwordsIcon, UserIcon } from "./icons";
-import { Avatar } from "./ui";
-
+import { BagIcon, DiceIcon, GiftIcon, SwordsIcon, UserIcon } from "./icons";
 const TABS = [
   { path: "/", Icon: SwordsIcon, label: "PvP" },
   { path: "/solo", Icon: DiceIcon, label: "Solo" },
+  { path: "/shop", Icon: BagIcon, label: "Shop" },
   { path: "/giveaways", Icon: GiftIcon, label: "Drops" },
   { path: "/profile", Icon: UserIcon, label: "Profile" },
 ];
@@ -33,20 +32,17 @@ export function Layout({ onTopUp }: { onTopUp: () => void }) {
   return (
     <div className="app">
       <header className="topbar">
-        <Link to="/profile" className="row" style={{ gap: "var(--sp-2)", color: "inherit" }}>
-          <Avatar src={user?.avatar} name={user?.first_name ?? "Player"} />
-          <div className="stack" style={{ gap: 0 }}>
-            <strong style={{ fontSize: 14 }}>{user?.first_name ?? "Player"}</strong>
-            <span className="faint">
-              {isGuest ? "Browser guest · " : ""}Level {user?.level ?? 1}
-            </span>
-          </div>
+        <Link to="/" className="wordmark" aria-label="gg.gram home">
+          gg<span className="wordmark-dot">.</span>gram
         </Link>
 
-        <button className="balance-pill num" onClick={() => { haptics.tap(); onTopUp(); }}>
-          {gg(user?.balance ?? 0)} GG
-          <span className="plus">+</span>
-        </button>
+        <div className="row" style={{ gap: "var(--sp-2)" }}>
+          {isGuest ? <span className="badge">guest</span> : null}
+          <button className="balance-pill num" onClick={() => { haptics.tap(); onTopUp(); }}>
+            {gg(user?.balance ?? 0)} GG
+            <span className="plus">+</span>
+          </button>
+        </div>
       </header>
 
       <Outlet />

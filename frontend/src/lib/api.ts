@@ -242,8 +242,9 @@ export const api = {
     request<SoloPlayResponse>("/solo/plinko/play", { method: "POST", body, idempotencyKey: key }),
   playUpgrade: (body: { bet: number; target: number }, key: string) =>
     request<SoloPlayResponse>("/solo/upgrade/play", { method: "POST", body, idempotencyKey: key }),
-  playLuckyBuy: (body: { case: string }, key: string) =>
-    request<SoloPlayResponse & { item: DropItem }>("/solo/lucky-buy/play", {
+  shop: (chance?: number) => request<ShopResponse>(`/solo/shop${query({ chance })}`),
+  playLuckyBuy: (body: { gift: string; chance: number }, key: string) =>
+    request<SoloPlayResponse & { item: DropItem | null }>("/solo/lucky-buy/play", {
       method: "POST",
       body,
       idempotencyKey: key,
@@ -358,14 +359,7 @@ export interface SoloConfig {
   house_edge: number;
   plinko: { rows: number[]; risks: string[]; tables: Record<string, number[]> };
   upgrade: { min_target: number; max_target: number; presets: { target: number; chance: number }[] };
-  lucky_buy: {
-    cases: {
-      code: string;
-      title: string;
-      price: number;
-      items: { code: string; name: string; rarity: string; chance: number; gg_value: number }[];
-    }[];
-  };
+  lucky_buy: { min_chance: number; max_chance: number; gifts: ShopGift[] };
   hi_lo: { max_rounds: number; choices: string[] };
   ice_arena: { max_rounds: number; difficulties: { difficulty: string; chance: number; step: number }[] };
 }
@@ -395,6 +389,25 @@ export interface IceArenaState {
   potential_reward: number;
   history: { round: number; difficulty: string; chance: number; step: number; survived: boolean; reward: number }[];
   options: { difficulty: string; chance: number; step: number; reward: number }[];
+}
+
+export interface ShopGift {
+  code: string;
+  name: string;
+  rarity: string;
+  glyph: string;
+  gg_value: number;
+  min_chance: number;
+  max_chance: number;
+  sample_chance: number;
+  sample_stake: number;
+}
+
+export interface ShopResponse {
+  gifts: ShopGift[];
+  min_chance: number;
+  max_chance: number;
+  house_edge: number;
 }
 
 export interface StarPayment {
