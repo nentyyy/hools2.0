@@ -81,3 +81,9 @@ def test_explicit_values_win_over_platform_defaults():
 
 def test_admin_ids_accept_a_csv_string():
     assert _settings(ADMIN_TELEGRAM_IDS="1,2,3").admin_telegram_ids == [1, 2, 3]
+
+
+def test_bot_username_is_cleaned():
+    # The value pasted from the template keeps its placeholder brackets.
+    assert _settings(BOT_USERNAME="<GGGgrambot").bot_username == "GGGgrambot"
+    assert _settings(BOT_USERNAME="@gg_bot ").bot_username == "gg_bot"

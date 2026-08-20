@@ -72,3 +72,20 @@ async def test_telegram_login_is_unaffected(client, browser_login_enabled):
 
     real = await authenticate(client, 9401)
     assert real["user"]["telegram_id"] == 9401
+
+
+async def test_browser_login_can_be_switched_on_at_runtime(client):
+    """Deployments that cannot edit env vars flip the flag through setup."""
+    from app.services import runtime_flags
+
+    assert (await client.post("/api/auth/guest", json={"device_id": "runtime-device-1"})).status_code == 403
+
+    await runtime_flags.set_browser_login(True)
+    try:
+        assert (await client.get("/api/auth/modes")).json()["guest"] is True
+        allowed = await client.post("/api/auth/guest", json={"device_id": "runtime-device-1"})
+        assert allowed.status_code == 200
+    finally:
+        await runtime_flags.set_browser_login(False)
+
+    assert (await client.post("/api/auth/guest", json={"device_id": "runtime-device-2"})).status_code == 403

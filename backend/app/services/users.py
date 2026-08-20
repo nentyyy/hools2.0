@@ -139,7 +139,9 @@ async def get_or_create_guest(
     so reopening the page returns to the same balance. A guest is never an
     administrator and never shares an id space with a Telegram user.
     """
-    if not settings.allow_browser_login:
+    from app.services.runtime_flags import browser_login_enabled
+
+    if not await browser_login_enabled():
         raise ForbiddenError("Browser play is disabled — open the app from Telegram")
 
     device_id = (device_id or "").strip()[:64]

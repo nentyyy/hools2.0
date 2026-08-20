@@ -95,6 +95,14 @@ class Settings(BaseSettings):
     rate_limit_play: str = "30/60"
     rate_limit_auth: str = "20/60"
 
+    @field_validator("bot_username", mode="before")
+    @classmethod
+    def _clean_username(cls, value: object) -> object:
+        """Tolerate `@name`, `<name>` and stray whitespace in the env value."""
+        if isinstance(value, str):
+            return value.strip().strip("<>").lstrip("@").strip()
+        return value
+
     @field_validator("admin_telegram_ids", "cors_origins", mode="before")
     @classmethod
     def _split_csv(cls, value: object) -> object:

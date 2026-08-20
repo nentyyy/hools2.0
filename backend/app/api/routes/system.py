@@ -13,6 +13,7 @@ from app.core.redis import get_redis
 from app.services import giveaways as giveaways_service
 from app.services import migrations as migrations_service
 from app.services import pvp as pvp_service
+from app.services import runtime_flags
 from app.services import telegram as telegram_service
 
 logger = logging.getLogger(__name__)
@@ -78,7 +79,7 @@ async def health(session: SessionDep) -> dict:
         "config": {
             "missing": missing,
             "admin_ids": len(settings.admin_telegram_ids),
-            "browser_login": settings.allow_browser_login,
+            "browser_login": await runtime_flags.browser_login_enabled(),
             "webapp_url": settings.webapp_url,
         },
         "hint": (
@@ -126,7 +127,9 @@ async def migrate(revision: str = "head") -> dict:
     methods=["GET", "POST"],
     dependencies=[Depends(require_cron_token), Depends(setup_limit)],
 )
-async def setup(request: Request, webhook_url: str | None = None) -> dict:
+async def setup(
+    request: Request, webhook_url: str | None = None, browser_login: bool | None = None
+) -> dict:
     """One-shot deployment finisher: migrate, then wire the bot up.
 
     Open it once in a browser after the first deploy:
@@ -137,6 +140,13 @@ async def setup(request: Request, webhook_url: str | None = None) -> dict:
     reported separately so a partial failure is visible rather than silent.
     """
     steps: dict[str, object] = {}
+
+    if browser_login is not None:
+        try:
+            state = await runtime_flags.set_browser_login(browser_login)
+            steps["browser_login"] = {"status": "ok", "enabled": state}
+        except Exception as exc:
+            steps["browser_login"] = {"status": "error", "message": str(exc)}
 
     try:
         steps["migrations"] = await migrations_service.upgrade()

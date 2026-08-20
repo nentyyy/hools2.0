@@ -7,7 +7,6 @@ import logging
 from fastapi import APIRouter, Depends
 
 from app.api.deps import CurrentUser, SessionDep, auth_limit, default_limit
-from app.core.config import settings
 from app.core.security import create_access_token, validate_init_data
 from app.schemas.user import (
     AuthRequest,
@@ -75,7 +74,9 @@ async def authenticate_guest(payload: GuestAuthRequest, session: SessionDep) -> 
 @router.get("/auth/modes", dependencies=[Depends(auth_limit)])
 async def auth_modes() -> dict:
     """Tells the client which sign-in paths this deployment accepts."""
-    return {"telegram": True, "guest": settings.allow_browser_login}
+    from app.services.runtime_flags import browser_login_enabled
+
+    return {"telegram": True, "guest": await browser_login_enabled()}
 
 
 @router.get("/me", response_model=UserPublic, dependencies=[Depends(default_limit)])

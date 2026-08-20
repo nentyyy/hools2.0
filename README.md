@@ -288,9 +288,17 @@ for.
 
 The Mini App normally refuses to sign anyone in without Telegram's signed
 `initData` — that check is what keeps a user from claiming someone else's
-account. For testing outside Telegram, set `ALLOW_BROWSER_LOGIN=true` and the
-app falls back to `POST /api/auth/guest`, which issues an account derived from a
-device id kept in local storage.
+account. For testing outside Telegram, the app falls back to
+`POST /api/auth/guest`, which issues an account derived from a device id kept in
+local storage.
+
+Enable it either with `ALLOW_BROWSER_LOGIN=true`, or — where editing environment
+variables is awkward — at runtime, which stores the switch in Redis:
+
+```
+https://<domain>/api/internal/setup?token=<CRON_SECRET>&browser_login=true
+…&browser_login=false     # turn it back off
+```
 
 Guests are deliberately second-class: they live in a reserved negative id range
 that no Telegram id can collide with, they can never be administrators, and the
