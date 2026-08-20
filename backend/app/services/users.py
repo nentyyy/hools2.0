@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import secrets
 import string
@@ -12,7 +13,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.core.errors import BannedError, NotFoundError
+from app.core.errors import BannedError, ForbiddenError, NotFoundError, ValidationError
 from app.core.security import TelegramUser
 from app.models import User
 from app.services import referrals
@@ -22,6 +23,15 @@ from gg_shared import TransactionType
 logger = logging.getLogger(__name__)
 
 _ALPHABET = string.ascii_uppercase + string.digits
+
+# Guest accounts live in a reserved negative id range so they can never collide
+# with a real Telegram id — and so a guest can never be matched to a real user.
+GUEST_ID_FLOOR = -10**15
+
+
+def guest_telegram_id(device_id: str) -> int:
+    digest = hashlib.sha256(f"guest:{device_id}".encode()).hexdigest()[:14]
+    return -(int(digest, 16) % 10**14) - 1
 
 
 def generate_referral_code() -> str:
@@ -118,3 +128,42 @@ def _refresh_profile(user: User, tg: TelegramUser) -> None:
 def ensure_active(user: User) -> None:
     if user.is_banned:
         raise BannedError(user.ban_reason or "Your account is banned")
+
+
+async def get_or_create_guest(
+    session: AsyncSession, device_id: str, *, start_param: str | None = None
+) -> tuple[User, bool]:
+    """Sign in a browser-only player.
+
+    The account is derived from a device id the client keeps in local storage,
+    so reopening the page returns to the same balance. A guest is never an
+    administrator and never shares an id space with a Telegram user.
+    """
+    if not settings.allow_browser_login:
+        raise ForbiddenError("Browser play is disabled — open the app from Telegram")
+
+    device_id = (device_id or "").strip()[:64]
+    if len(device_id) < 8:
+        raise ValidationError("device_id must be at least 8 characters")
+
+    telegram_id = guest_telegram_id(device_id)
+    suffix = f"{abs(telegram_id) % 10000:04d}"
+    tg_user = TelegramUser(
+        telegram_id=telegram_id,
+        username=None,
+        first_name=f"Guest {suffix}",
+        last_name=None,
+        language_code=None,
+        photo_url=None,
+        is_premium=False,
+        start_param=start_param,
+        auth_date=0,
+        raw={"guest": True},
+    )
+
+    user, created = await get_or_create(session, tg_user, start_param=start_param)
+    if user.is_admin:  # defensive: a guest must never inherit admin rights
+        user.is_admin = False
+    if created:
+        logger.info("guest_registered", extra={"user_id": user.id})
+    return user, created

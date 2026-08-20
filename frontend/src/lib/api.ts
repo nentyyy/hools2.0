@@ -168,6 +168,15 @@ export const api = {
       auth: false,
     }),
 
+  authenticateGuest: (deviceId: string, startParam?: string) =>
+    request<AuthResponse>("/auth/guest", {
+      method: "POST",
+      body: { device_id: deviceId, start_param: startParam },
+      auth: false,
+    }),
+
+  authModes: () => request<{ telegram: boolean; guest: boolean }>("/auth/modes", { auth: false }),
+
   me: () => request<User>("/me"),
   balance: () => request<{ balance: number; currency: string }>("/balance"),
   profile: () => request<ProfileResponse>("/profile"),

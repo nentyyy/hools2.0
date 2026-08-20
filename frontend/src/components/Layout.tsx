@@ -17,7 +17,7 @@ const TABS = [
 ];
 
 export function Layout({ onTopUp }: { onTopUp: () => void }) {
-  const { user } = useSession();
+  const { user, isGuest } = useSession();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -36,7 +36,9 @@ export function Layout({ onTopUp }: { onTopUp: () => void }) {
           <Avatar src={user?.avatar} name={user?.first_name ?? "Player"} />
           <div className="stack" style={{ gap: 0 }}>
             <strong style={{ fontSize: 14 }}>{user?.first_name ?? "Player"}</strong>
-            <span className="faint">Level {user?.level ?? 1}</span>
+            <span className="faint">
+              {isGuest ? "Browser guest · " : ""}Level {user?.level ?? 1}
+            </span>
           </div>
         </Link>
 

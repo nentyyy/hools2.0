@@ -33,6 +33,7 @@ export default function App() {
   }
 
   if (status === "error") {
+    const botUrl = `https://t.me/${import.meta.env.VITE_BOT_USERNAME ?? ""}`;
     return (
       <div className="app">
         <Screen>
@@ -40,7 +41,12 @@ export default function App() {
             <span className="glyph">🔒</span>
             <strong>Can't sign you in</strong>
             <span className="faint">{error}</span>
-            <button className="btn btn-primary" style={{ marginTop: "var(--sp-4)" }} onClick={retry}>
+            {import.meta.env.VITE_BOT_USERNAME ? (
+              <a className="btn btn-primary" style={{ marginTop: "var(--sp-4)" }} href={botUrl}>
+                Open in Telegram
+              </a>
+            ) : null}
+            <button className="btn btn-ghost btn-sm" style={{ marginTop: "var(--sp-2)" }} onClick={retry}>
               Try again
             </button>
           </div>

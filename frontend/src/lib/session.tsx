@@ -12,11 +12,13 @@ import type { ReactNode } from "react";
 import type { User } from "@shared/index";
 
 import { ApiError, api, getToken, setToken } from "./api";
-import { getInitData, getStartParam, insideTelegram } from "./telegram";
+import { getDeviceId } from "./device";
+import { getInitData, getStartParam } from "./telegram";
 
 interface SessionValue {
   user: User | null;
   status: "loading" | "ready" | "error";
+  isGuest: boolean;
   error: string | null;
   balance: number;
   setBalance: (value: number) => void;
@@ -54,17 +56,22 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         }
 
         const initData = getInitData();
-        if (!initData) {
-          throw new ApiError(
-            "not_in_telegram",
-            insideTelegram()
-              ? "Could not read Telegram launch data."
-              : "Open this app from Telegram to sign in.",
-            0,
-          );
-        }
 
-        const auth = await api.authenticate(initData, getStartParam());
+        // Outside Telegram there is no signed launch data, so fall back to a
+        // guest account — which the backend only issues when browser play is
+        // explicitly enabled for the deployment.
+        const auth = initData
+          ? await api.authenticate(initData, getStartParam())
+          : await api.authenticateGuest(getDeviceId(), getStartParam()).catch((error: unknown) => {
+              if (error instanceof ApiError && error.status === 403) {
+                throw new ApiError(
+                  "not_in_telegram",
+                  "Open this app from Telegram to sign in.",
+                  403,
+                );
+              }
+              throw error;
+            });
         setToken(auth.token);
         if (!cancelled) {
           setUser(auth.user);
@@ -100,6 +107,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       user,
       status,
       error,
+      // Guests live in a reserved negative id range on the backend.
+      isGuest: (user?.telegram_id ?? 0) < 0,
       balance: user?.balance ?? 0,
       setBalance,
       refresh,

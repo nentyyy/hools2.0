@@ -284,6 +284,19 @@ confirmed against a public indexer, never against what the client claims. TON is
 **not** used to sell digital goods inside the Mini App; that is what Stars are
 for.
 
+## Playing in a browser
+
+The Mini App normally refuses to sign anyone in without Telegram's signed
+`initData` — that check is what keeps a user from claiming someone else's
+account. For testing outside Telegram, set `ALLOW_BROWSER_LOGIN=true` and the
+app falls back to `POST /api/auth/guest`, which issues an account derived from a
+device id kept in local storage.
+
+Guests are deliberately second-class: they live in a reserved negative id range
+that no Telegram id can collide with, they can never be administrators, and the
+Telegram path is untouched by the flag. Turn it off when you are done — with it
+on, anyone holding the URL can mint accounts and collect the signup bonus.
+
 ## Games
 
 | Mode | Endpoint | Model |

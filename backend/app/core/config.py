@@ -50,6 +50,9 @@ class Settings(BaseSettings):
     webapp_url: str = _DEFAULT_WEBAPP_URL
     telegram_webhook_secret: str = ""
     init_data_ttl: int = 86400  # seconds an initData signature stays valid
+    # Lets the Mini App be played in a plain browser through a guest account.
+    # Off by default: with it on, anyone holding the URL can mint accounts.
+    allow_browser_login: bool = False
 
     # --- storage -----------------------------------------------------------
     database_url: str = _DEFAULT_DATABASE_URL

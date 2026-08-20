@@ -16,6 +16,13 @@ class AuthRequest(BaseModel):
     model_config = {"populate_by_name": True}
 
 
+class GuestAuthRequest(BaseModel):
+    """Browser play: the device id is a random string the client stores locally."""
+
+    device_id: str = Field(min_length=8, max_length=64)
+    start_param: str | None = Field(default=None, max_length=64)
+
+
 class UserPublic(ORMModel):
     id: int
     telegram_id: int
