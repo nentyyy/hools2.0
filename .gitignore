@@ -24,3 +24,6 @@ dist/
 .DS_Store
 *.log
 coverage/
+
+# redis snapshot written by a locally started redis-server
+dump.rdb
