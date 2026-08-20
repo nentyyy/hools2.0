@@ -23,7 +23,7 @@ from app.schemas.game import PvPCreateRequest, PvPJoinRequest
 from app.services import pvp as pvp_service
 from app.ws.events import pvp_channel
 from app.ws.manager import manager
-from gg_shared import PvPStatus
+from gg_shared import PvPMode, PvPStatus
 
 router = APIRouter(prefix="/pvp", tags=["pvp"])
 
@@ -44,6 +44,7 @@ async def list_games(
     session: SessionDep,
     user: CurrentUser,
     status: Annotated[str | None, Query()] = None,
+    mode: Annotated[str | None, Query(description="wheel or ice; omit for both")] = None,
     limit: Annotated[int, Query(ge=1, le=50)] = 20,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> dict:
@@ -52,18 +53,25 @@ async def list_games(
         if status
         else [PvPStatus.WAITING.value, PvPStatus.STARTING.value, PvPStatus.SPINNING.value]
     )
-    games = await pvp_service.list_games(session, statuses=statuses, limit=limit, offset=offset)
+    games = await pvp_service.list_games(
+        session, statuses=statuses, mode=mode, limit=limit, offset=offset
+    )
     return {"items": [await serialize_pvp(session, g) for g in games], "config": _config()}
 
 
 @router.get("/current", dependencies=[Depends(default_limit)])
-async def current(session: SessionDep, user: CurrentUser) -> dict:
+async def current(
+    session: SessionDep,
+    user: CurrentUser,
+    mode: Annotated[str, Query(description="wheel or ice")] = PvPMode.WHEEL.value,
+) -> dict:
     """The round the arena shows: the live one, or the last finished result."""
-    game = await pvp_service.current_game(session)
+    game = await pvp_service.current_game(session, mode)
     await session.commit()
     return {
         "game": await serialize_pvp(session, game) if game else None,
         "config": _config(),
+        "mode": mode,
     }
 
 
@@ -80,7 +88,7 @@ async def quick_join(
         return guard.cached
     try:
         game, created = await pvp_service.quick_join(
-            session, user, payload.amount, idempotency_key=guard.key
+            session, user, payload.amount, mode=payload.mode, idempotency_key=guard.key
         )
         await session.commit()
         await session.refresh(game)
@@ -99,19 +107,24 @@ async def quick_join(
 
 
 @router.get("/highlights", dependencies=[Depends(default_limit)])
-async def highlights(session: SessionDep, user: CurrentUser) -> dict:
+async def highlights(
+    session: SessionDep,
+    user: CurrentUser,
+    mode: Annotated[str, Query(description="wheel or ice")] = PvPMode.WHEEL.value,
+) -> dict:
     """Ticker data for the arena header: the last round, the biggest one, online."""
+    mode = pvp_service.validate_mode(mode)
     finished = [PvPStatus.FINISHED.value]
 
     last = await session.scalar(
         select(PvPGame)
-        .where(PvPGame.status.in_(finished), PvPGame.winner_id.isnot(None))
+        .where(PvPGame.mode == mode, PvPGame.status.in_(finished), PvPGame.winner_id.isnot(None))
         .order_by(PvPGame.finished_at.desc())
         .limit(1)
     )
     top = await session.scalar(
         select(PvPGame)
-        .where(PvPGame.status.in_(finished), PvPGame.winner_id.isnot(None))
+        .where(PvPGame.mode == mode, PvPGame.status.in_(finished), PvPGame.winner_id.isnot(None))
         .order_by(PvPGame.total_pool.desc())
         .limit(1)
     )
@@ -155,7 +168,7 @@ async def create_game(
         return guard.cached
     try:
         game = await pvp_service.create_game(
-            session, user, payload.amount, idempotency_key=guard.key
+            session, user, payload.amount, mode=payload.mode, idempotency_key=guard.key
         )
         await session.commit()
         await session.refresh(game)
@@ -202,6 +215,14 @@ async def join_game(
 async def get_game(game_id: int, user: CurrentUser, session: SessionDep) -> dict:
     game = await pvp_service.get_game(session, game_id)
     return {"game": await serialize_pvp(session, game)}
+
+
+@router.get("/{game_id}/replay", dependencies=[Depends(default_limit)])
+async def replay(game_id: int, user: CurrentUser, session: SessionDep) -> dict:
+    """A finished round as a timeline, playable from the first bet."""
+    game = await pvp_service.get_game(session, game_id)
+    timeline = await pvp_service.replay(session, game_id)
+    return {"game": await serialize_pvp(session, game), "replay": timeline}
 
 
 @router.get("/{game_id}/state", dependencies=[Depends(default_limit)])

@@ -16,9 +16,10 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, PrimaryKeyMixin, TimestampMixin
-from gg_shared import PvPStatus
+from gg_shared import PvPMode, PvPStatus
 
 _STATUSES = ", ".join(f"'{s.value}'" for s in PvPStatus)
+_MODES = ", ".join(f"'{m.value}'" for m in PvPMode)
 
 
 class PvPGame(Base, PrimaryKeyMixin, TimestampMixin):
@@ -31,12 +32,17 @@ class PvPGame(Base, PrimaryKeyMixin, TimestampMixin):
     __tablename__ = "pvp_games"
     __table_args__ = (
         CheckConstraint(f"status IN ({_STATUSES})", name="status_valid"),
+        CheckConstraint(f"mode IN ({_MODES})", name="mode_valid"),
         CheckConstraint("total_pool >= 0", name="pool_non_negative"),
         Index("ix_pvp_games_status_created", "status", "created_at"),
+        Index("ix_pvp_games_mode_status", "mode", "status", "created_at"),
     )
 
     status: Mapped[str] = mapped_column(
         String(16), default=PvPStatus.WAITING.value, server_default=PvPStatus.WAITING.value, nullable=False
+    )
+    mode: Mapped[str] = mapped_column(
+        String(16), default=PvPMode.WHEEL.value, server_default=PvPMode.WHEEL.value, nullable=False
     )
     total_pool: Mapped[int] = mapped_column(BigInteger, default=0, server_default="0", nullable=False)
     rake: Mapped[int] = mapped_column(BigInteger, default=0, server_default="0", nullable=False)

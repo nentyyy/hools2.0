@@ -24,6 +24,7 @@ async def serialize_pvp(session: AsyncSession, game: PvPGame) -> dict:
     return {
         "id": game.id,
         "status": game.status,
+        "mode": game.mode,
         "total_pool": int(game.total_pool),
         "prize": int(game.prize),
         "rake": int(game.rake),

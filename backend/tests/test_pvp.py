@@ -210,3 +210,85 @@ async def test_the_arena_clears_once_a_result_has_been_read(client, monkeypatch)
     monkeypatch.setattr(service, "RESULT_LINGER", timedelta(seconds=0))
     cleared = (await client.get("/api/pvp/current", headers=host)).json()
     assert cleared["game"] is None
+
+
+async def test_wheel_and_ice_rounds_never_share_a_pot(client):
+    """The two boards are separate games; a bet must not cross between them."""
+    a, _ = await _login(client, 7201)
+    b, _ = await _login(client, 7202)
+
+    wheel = await client.post("/api/pvp/quick-join", json={"amount": 100, "mode": "wheel"}, headers=a)
+    ice = await client.post("/api/pvp/quick-join", json={"amount": 100, "mode": "ice"}, headers=b)
+
+    assert wheel.status_code == ice.status_code == 200
+    assert wheel.json()["game"]["mode"] == "wheel"
+    assert ice.json()["game"]["mode"] == "ice"
+    assert wheel.json()["game"]["id"] != ice.json()["game"]["id"]
+    # An ice bet joined an ice round, so the wheel pot is untouched by it.
+    assert ice.json()["game"]["total_pool"] == 100
+
+    current_wheel = (await client.get("/api/pvp/current?mode=wheel", headers=a)).json()["game"]
+    current_ice = (await client.get("/api/pvp/current?mode=ice", headers=a)).json()["game"]
+    assert current_wheel["mode"] == "wheel"
+    assert current_ice["mode"] == "ice"
+    assert current_wheel["id"] != current_ice["id"]
+
+
+async def test_matchmaking_keeps_each_mode_together(client):
+    a, _ = await _login(client, 7203)
+    b, _ = await _login(client, 7204)
+
+    # Open a fresh ice round so the assertion does not depend on what earlier
+    # tests left waiting.
+    first = await client.post("/api/pvp/create", json={"amount": 50, "mode": "ice"}, headers=a)
+    assert first.json()["game"]["mode"] == "ice"
+
+    second = await client.post("/api/pvp/quick-join", json={"amount": 70, "mode": "ice"}, headers=b)
+    assert second.json()["game"]["id"] == first.json()["game"]["id"]
+    assert second.json()["game"]["total_pool"] == 120
+
+    # A wheel player pressing the button at the same moment opens their own round.
+    c, _ = await _login(client, 7206)
+    wheel = await client.post("/api/pvp/quick-join", json={"amount": 70, "mode": "wheel"}, headers=c)
+    assert wheel.json()["game"]["id"] != first.json()["game"]["id"]
+
+
+async def test_an_unknown_mode_is_rejected(client):
+    a, _ = await _login(client, 7205)
+    response = await client.post("/api/pvp/quick-join", json={"amount": 50, "mode": "roulette"}, headers=a)
+    assert response.status_code == 422
+
+
+async def test_a_round_can_be_replayed_from_the_first_bet(client):
+    """The replay is derived from the round itself, not a second record of it."""
+    a, first = await _login(client, 7301)
+    b, second = await _login(client, 7302)
+
+    game_id = (await client.post("/api/pvp/create", json={"amount": 300}, headers=a)).json()["game"]["id"]
+    await asyncio.sleep(0.2)
+    await client.post(f"/api/pvp/{game_id}/join", json={"amount": 100}, headers=b)
+    await asyncio.sleep(2.4)
+
+    response = await client.get(f"/api/pvp/{game_id}/replay", headers=a)
+    assert response.status_code == 200, response.text
+    timeline = response.json()["replay"]
+
+    assert timeline["status"] == "finished"
+    assert timeline["mode"] == "wheel"
+
+    kinds = [event["type"] for event in timeline["events"]]
+    assert kinds[0] == "player_joined"
+    assert kinds.count("player_joined") == 2
+    assert {"countdown", "spin", "finished"} <= set(kinds)
+
+    joins = [event for event in timeline["events"] if event["type"] == "player_joined"]
+    # The first bet anchors the timeline and the pot grows in order.
+    assert joins[0]["at"] == 0
+    assert joins[0]["user_id"] == first["id"] and joins[0]["pool"] == 300
+    assert joins[1]["user_id"] == second["id"] and joins[1]["pool"] == 400
+    assert joins[1]["at"] > 0
+
+    end = next(event for event in timeline["events"] if event["type"] == "finished")
+    assert end["prize"] == 380
+    assert end["roll"] == response.json()["game"]["winning_roll"]
+    assert timeline["duration"] >= end["at"]

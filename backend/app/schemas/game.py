@@ -26,6 +26,7 @@ class PvPPlayerPublic(BaseModel):
 class PvPGamePublic(BaseModel):
     id: int
     status: str
+    mode: str
     total_pool: int
     prize: int
     rake: int
@@ -50,10 +51,13 @@ class PvPGamePublic(BaseModel):
 
 class PvPCreateRequest(BaseModel):
     amount: int = Field(ge=1, le=10_000_000)
+    mode: Literal["wheel", "ice"] = "wheel"
 
 
 class PvPJoinRequest(BaseModel):
     amount: int = Field(ge=1, le=10_000_000)
+    # Only quick-join uses this; joining a specific round takes its mode.
+    mode: Literal["wheel", "ice"] = "wheel"
 
 
 class PvPStateResponse(BaseModel):

@@ -18,6 +18,8 @@ export const TransactionType = {
 export type TransactionType = (typeof TransactionType)[keyof typeof TransactionType];
 
 export type PvPStatus = "waiting" | "starting" | "spinning" | "finished" | "cancelled";
+/** Wheel and ice rounds are separate games — bets never mix between them. */
+export type PvPMode = "wheel" | "ice";
 export type SoloGameType = "plinko" | "upgrade" | "lucky_buy" | "hi_lo" | "ice_arena";
 export type SoloStatus = "active" | "finished" | "cashed_out" | "lost";
 export type GiveawayStatus = "draft" | "active" | "finished" | "cancelled";
@@ -104,6 +106,7 @@ export interface PvPPlayer {
 export interface PvPGame {
   id: number;
   status: PvPStatus;
+  mode: PvPMode;
   total_pool: number;
   prize: number;
   rake: number;

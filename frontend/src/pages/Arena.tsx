@@ -11,7 +11,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import type { PvPGame } from "@shared/index";
+import type { PvPGame, PvPMode } from "@shared/index";
 
 import { HistoryIcon, UsersIcon } from "@/components/icons";
 import { IceRink } from "@/components/IceRink";
@@ -34,14 +34,14 @@ export function ArenaPage() {
 
   const [bet, setBet] = useState(100);
   const [announced, setAnnounced] = useState<number | null>(null);
-  // Two ways to watch the same round; the choice is remembered per device.
-  const [view, setView] = useState<"wheel" | "ice">(
-    () => (localStorage.getItem("gg.arena-view") as "wheel" | "ice") ?? "wheel",
+  // Two separate games, not two skins: each mode runs its own rounds and pots.
+  const [mode, setMode] = useState<PvPMode>(
+    () => (localStorage.getItem("gg.arena-mode") as PvPMode) ?? "wheel",
   );
 
   const current = useQuery({
-    queryKey: ["pvp", "current"],
-    queryFn: api.pvpCurrent,
+    queryKey: ["pvp", "current", mode],
+    queryFn: () => api.pvpCurrent(mode),
     // The draw is published when the spin starts, so the closer a round is to
     // resolving the more it matters that we hear about it promptly.
     refetchInterval: (query) => {
@@ -50,8 +50,8 @@ export function ArenaPage() {
     },
   });
   const highlights = useQuery({
-    queryKey: ["pvp", "highlights"],
-    queryFn: api.pvpHighlights,
+    queryKey: ["pvp", "highlights", mode],
+    queryFn: () => api.pvpHighlights(mode),
     refetchInterval: 15000,
   });
 
@@ -68,7 +68,7 @@ export function ArenaPage() {
   );
 
   const join = useMutation({
-    mutationFn: () => api.pvpQuickJoin(bet, newIdempotencyKey()),
+    mutationFn: () => api.pvpQuickJoin(bet, mode, newIdempotencyKey()),
     onSuccess: (result) => {
       haptics.tap("medium");
       setBalance(result.balance);
@@ -124,11 +124,11 @@ export function ArenaPage() {
         {(["wheel", "ice"] as const).map((value) => (
           <button
             key={value}
-            data-active={view === value}
+            data-active={mode === value}
             onClick={() => {
               haptics.select();
-              setView(value);
-              localStorage.setItem("gg.arena-view", value);
+              setMode(value);
+              localStorage.setItem("gg.arena-mode", value);
             }}
           >
             {value === "wheel" ? "Wheel" : "Ice arena"}
@@ -136,7 +136,7 @@ export function ArenaPage() {
         ))}
       </div>
 
-      {view === "wheel" ? (
+      {mode === "wheel" ? (
         <Wheel
           players={game?.players ?? []}
           totalPool={game?.total_pool ?? 0}

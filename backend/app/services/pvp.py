@@ -29,7 +29,7 @@ from app.models import PvPGame, PvPPlayer, User
 from app.services.ledger import apply_change, lock_user
 from app.services.leveling import xp_for_wager
 from app.ws.events import PvPEvent, publish_pvp_event
-from gg_shared import PvPStatus, TransactionType
+from gg_shared import PvPMode, PvPStatus, TransactionType
 
 logger = logging.getLogger(__name__)
 
@@ -86,15 +86,31 @@ def validate_bet(amount: int) -> int:
     return amount
 
 
+def validate_mode(mode: str | PvPMode | None) -> str:
+    if mode is None:
+        return PvPMode.WHEEL.value
+    try:
+        return PvPMode(mode).value
+    except ValueError as exc:
+        raise ValidationError(f"Unknown PvP mode: {mode}") from exc
+
+
 async def create_game(
-    session: AsyncSession, user: User, amount: int, *, idempotency_key: str | None = None
+    session: AsyncSession,
+    user: User,
+    amount: int,
+    *,
+    mode: str | PvPMode | None = None,
+    idempotency_key: str | None = None,
 ) -> PvPGame:
     """Open a lobby and seat the creator with the first bet."""
     amount = validate_bet(amount)
+    mode = validate_mode(mode)
     server_seed, server_hash = rng.new_server_seed()
 
     game = PvPGame(
         status=PvPStatus.WAITING.value,
+        mode=mode,
         creator_id=user.id,
         min_bet=settings.pvp_min_bet,
         max_players=settings.pvp_max_players,
@@ -126,7 +142,9 @@ async def create_game(
     game.nonce = game.id
     await session.flush()
 
-    logger.info("pvp_created", extra={"game_id": game.id, "user_id": user.id, "amount": amount})
+    logger.info(
+        "pvp_created", extra={"game_id": game.id, "user_id": user.id, "amount": amount, "mode": mode}
+    )
     return game
 
 
@@ -221,22 +239,31 @@ def _join_grace() -> timedelta:
 
 
 async def quick_join(
-    session: AsyncSession, user: User, amount: int, *, idempotency_key: str | None = None
+    session: AsyncSession,
+    user: User,
+    amount: int,
+    *,
+    mode: str | PvPMode | None = None,
+    idempotency_key: str | None = None,
 ) -> tuple[PvPGame, bool]:
-    """Seat the player in the current round, opening one if there is none.
+    """Seat the player in the current round of a mode, opening one if needed.
 
-    Matchmaking is serialised so two players pressing the button at the same
-    moment end up in the same round rather than in two half-empty ones.
-    Returns (game, created).
+    Matchmaking is serialised per mode, so two players pressing the button at
+    the same moment end up in the same round rather than in two half-empty ones
+    — and a wheel bet never lands in an ice round. Returns (game, created).
     """
     amount = validate_bet(amount)
+    mode = validate_mode(mode)
 
-    async with distributed_lock("pvp:matchmaking", ttl=10):
+    async with distributed_lock(f"pvp:matchmaking:{mode}", ttl=10):
         now = _now()
         candidates = (
             await session.execute(
                 select(PvPGame)
-                .where(PvPGame.status.in_([PvPStatus.WAITING.value, PvPStatus.STARTING.value]))
+                .where(
+                    PvPGame.mode == mode,
+                    PvPGame.status.in_([PvPStatus.WAITING.value, PvPStatus.STARTING.value]),
+                )
                 .order_by(PvPGame.created_at.desc())
                 .limit(10)
             )
@@ -252,26 +279,28 @@ async def quick_join(
                 continue
             return await join_game(session, user, game.id, amount, idempotency_key=idempotency_key), False
 
-        return await create_game(session, user, amount, idempotency_key=idempotency_key), True
+        return await create_game(session, user, amount, mode=mode, idempotency_key=idempotency_key), True
 
 
 # How long a settled round keeps the arena before it clears for the next one.
 RESULT_LINGER = timedelta(seconds=20)
 
 
-async def current_game(session: AsyncSession) -> PvPGame | None:
+async def current_game(session: AsyncSession, mode: str | PvPMode | None = None) -> PvPGame | None:
     """The round the arena should show.
 
     A live round wins. Otherwise the last result lingers briefly so everyone can
     read it, and then the arena goes empty again — leaving a finished round on
     screen indefinitely makes a quiet lobby look like a frozen one.
     """
+    mode = validate_mode(mode)
     live = await session.scalar(
         select(PvPGame)
         .where(
+            PvPGame.mode == mode,
             PvPGame.status.in_(
                 [PvPStatus.WAITING.value, PvPStatus.STARTING.value, PvPStatus.SPINNING.value]
-            )
+            ),
         )
         .order_by(PvPGame.created_at.desc())
         .limit(1)
@@ -281,7 +310,7 @@ async def current_game(session: AsyncSession) -> PvPGame | None:
 
     recent = await session.scalar(
         select(PvPGame)
-        .where(PvPGame.status == PvPStatus.FINISHED.value)
+        .where(PvPGame.mode == mode, PvPGame.status == PvPStatus.FINISHED.value)
         .order_by(PvPGame.finished_at.desc())
         .limit(1)
     )
@@ -453,11 +482,18 @@ async def _settle(session: AsyncSession, game: PvPGame, *, notify: bool) -> None
 
 
 async def list_games(
-    session: AsyncSession, *, statuses: list[str] | None = None, limit: int = 30, offset: int = 0
+    session: AsyncSession,
+    *,
+    statuses: list[str] | None = None,
+    mode: str | PvPMode | None = None,
+    limit: int = 30,
+    offset: int = 0,
 ) -> list[PvPGame]:
     stmt = select(PvPGame).order_by(PvPGame.created_at.desc()).limit(limit).offset(offset)
     if statuses:
         stmt = stmt.where(PvPGame.status.in_(statuses))
+    if mode is not None:
+        stmt = stmt.where(PvPGame.mode == validate_mode(mode))
     games = list((await session.execute(stmt)).scalars().all())
 
     # Lobbies shown in the list must not look alive when their timer has run out.
@@ -504,3 +540,78 @@ async def tick(session: AsyncSession, limit: int = 50) -> int:
             await session.rollback()
             logger.exception("pvp tick failed for game %s", game.id)
     return processed
+
+
+async def replay(session: AsyncSession, game_id: int) -> dict:
+    """Reconstruct a finished round as a timeline, from the first bet onwards.
+
+    Nothing extra is recorded to make this work: every seat carries the moment
+    it was taken, and the round carries when it locked in, span and settled. The
+    replay is therefore the round itself rather than a second, separately stored
+    account of it — there is no way for the two to disagree.
+    """
+    game = await session.get(PvPGame, game_id)
+    if game is None:
+        raise NotFoundError("PvP game not found")
+
+    players = await _players(session, game.id)
+    user_ids = [p.user_id for p in players]
+    users: dict[int, User] = {}
+    if user_ids:
+        rows = (await session.execute(select(User).where(User.id.in_(user_ids)))).scalars().all()
+        users = {u.id: u for u in rows}
+
+    origin = _aware(players[0].created_at) if players else _aware(game.created_at)
+    if origin is None:  # pragma: no cover - only for rows written without a clock
+        origin = _now()
+
+    def offset(moment) -> float:
+        value = _aware(moment)
+        return round((value - origin).total_seconds(), 3) if value else 0.0
+
+    events: list[dict] = []
+    pool = 0
+    for seat in sorted(players, key=lambda p: (p.created_at, p.id)):
+        pool += int(seat.amount)
+        user = users.get(seat.user_id)
+        events.append(
+            {
+                "at": offset(seat.created_at),
+                "type": "player_joined",
+                "user_id": seat.user_id,
+                "name": user.display_name if user else f"Player #{seat.user_id}",
+                "avatar": user.avatar if user else None,
+                "amount": int(seat.amount),
+                "pool": pool,
+            }
+        )
+
+    if game.started_at:
+        events.append(
+            {
+                "at": offset(game.started_at),
+                "type": "countdown",
+                "seconds": settings.pvp_countdown_seconds,
+            }
+        )
+    if game.spin_at:
+        events.append({"at": offset(game.spin_at), "type": "spin", "seconds": settings.pvp_spin_seconds})
+    if game.finished_at:
+        events.append(
+            {
+                "at": offset(game.finished_at),
+                "type": "finished",
+                "winner_id": game.winner_id,
+                "prize": int(game.prize),
+                "roll": game.winning_roll,
+            }
+        )
+
+    events.sort(key=lambda event: event["at"])
+    return {
+        "game_id": game.id,
+        "mode": game.mode,
+        "status": game.status,
+        "duration": events[-1]["at"] if events else 0.0,
+        "events": events,
+    }

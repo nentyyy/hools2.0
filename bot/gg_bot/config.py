@@ -12,6 +12,7 @@ from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 _DEFAULT_BACKEND_URL = "http://localhost:8000"
+_DEFAULT_WEBAPP_URL = "http://localhost:5173"
 
 
 class BotSettings(BaseSettings):
@@ -21,7 +22,7 @@ class BotSettings(BaseSettings):
 
     bot_token: str = ""
     bot_username: str = "gggram_bot"
-    webapp_url: str = "http://localhost:5173"
+    webapp_url: str = _DEFAULT_WEBAPP_URL
 
     # The bot owns no database: everything goes through the backend's internal API.
     backend_url: str = _DEFAULT_BACKEND_URL
@@ -72,13 +73,24 @@ class BotSettings(BaseSettings):
 @lru_cache
 def get_settings() -> BotSettings:
     settings = BotSettings()
-    # A separate bot process on a managed host has no localhost backend to call.
-    if settings.backend_url == _DEFAULT_BACKEND_URL:
-        for name in ("VERCEL_PROJECT_PRODUCTION_URL", "VERCEL_URL"):
-            value = os.getenv(name)
-            if value:
-                settings.backend_url = value if value.startswith("http") else f"https://{value}"
-                break
+    # A separate bot process on a managed host has no localhost backend to call,
+    # and Telegram refuses a Mini App button that is not HTTPS — so both URLs
+    # fall back to the deployment's own address when left at their local values.
+    deployment = next(
+        (
+            os.getenv(name)
+            for name in ("VERCEL_PROJECT_PRODUCTION_URL", "VERCEL_URL")
+            if os.getenv(name)
+        ),
+        None,
+    )
+    if deployment and not deployment.startswith("http"):
+        deployment = f"https://{deployment}"
+
+    if deployment and settings.backend_url == _DEFAULT_BACKEND_URL:
+        settings.backend_url = deployment
+    if deployment and settings.webapp_url == _DEFAULT_WEBAPP_URL:
+        settings.webapp_url = deployment
     return settings
 
 

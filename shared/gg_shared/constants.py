@@ -25,6 +25,13 @@ class TransactionType(StrEnum):
     ADMIN_ADJUSTMENT = "admin_adjustment"
 
 
+class PvPMode(StrEnum):
+    """Wheel and ice rounds are separate games — bets never mix between them."""
+
+    WHEEL = "wheel"
+    ICE = "ice"
+
+
 class PvPStatus(StrEnum):
     WAITING = "waiting"
     STARTING = "starting"

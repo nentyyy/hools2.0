@@ -1081,3 +1081,22 @@ a { color: var(--accent); text-decoration: none; }
   color: var(--accent);
   flex: 0 0 auto;
 }
+
+/* ---------- replay ---------- */
+.replay-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+}
+.replay-track {
+  flex: 1;
+  height: 6px;
+  border-radius: var(--r-full);
+  background: var(--surface-3);
+  overflow: hidden;
+}
+.replay-track > span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}

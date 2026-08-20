@@ -13,24 +13,33 @@ def webapp_url(path: str = "/") -> str:
     return f"{base}/#{path}" if path and path != "/" else base
 
 
+def _mini_app_available() -> bool:
+    """Telegram only accepts HTTPS for Mini App buttons."""
+    return settings.webapp_url.startswith("https://")
+
+
+def app_button(text: str, path: str = "/") -> InlineKeyboardButton:
+    """A Mini App button where Telegram allows one, a plain link otherwise.
+
+    Without this a misconfigured WEBAPP_URL makes every keyboard rejected by the
+    Bot API, and the user just sees "something went wrong".
+    """
+    url = webapp_url(path)
+    if _mini_app_available():
+        return InlineKeyboardButton(text=text, web_app=WebAppInfo(url=url))
+    return InlineKeyboardButton(text=text, url=url)
+
+
 def open_app(text: str = "🎮 Open gg.gram", path: str = "/") -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(
-        inline_keyboard=[[InlineKeyboardButton(text=text, web_app=WebAppInfo(url=webapp_url(path)))]]
-    )
+    return InlineKeyboardMarkup(inline_keyboard=[[app_button(text, path)]])
 
 
 def main_menu() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="🎮 Play", web_app=WebAppInfo(url=webapp_url("/")))],
-            [
-                InlineKeyboardButton(text="⚔️ PvP", web_app=WebAppInfo(url=webapp_url("/pvp"))),
-                InlineKeyboardButton(text="🎲 Solo", web_app=WebAppInfo(url=webapp_url("/solo"))),
-            ],
-            [
-                InlineKeyboardButton(text="🎁 Giveaways", web_app=WebAppInfo(url=webapp_url("/giveaways"))),
-                InlineKeyboardButton(text="👤 Profile", web_app=WebAppInfo(url=webapp_url("/profile"))),
-            ],
+            [app_button("🎮 Play", "/")],
+            [app_button("⚔️ PvP", "/pvp"), app_button("🎲 Solo", "/solo")],
+            [app_button("🎁 Giveaways", "/giveaways"), app_button("👤 Profile", "/profile")],
             [InlineKeyboardButton(text="⭐ Top up GG", callback_data="topup")],
         ]
     )
@@ -44,11 +53,8 @@ def games_menu() -> InlineKeyboardMarkup:
         ("🃏 Hi-Lo", "/solo/hi-lo"),
         ("🧊 Ice Arena", "/solo/ice-arena"),
     ]
-    rows = [
-        [InlineKeyboardButton(text=title, web_app=WebAppInfo(url=webapp_url(path)))]
-        for title, path in modes
-    ]
-    rows.insert(0, [InlineKeyboardButton(text="⚔️ PvP arena", web_app=WebAppInfo(url=webapp_url("/pvp")))])
+    rows = [[app_button(title, path)] for title, path in modes]
+    rows.insert(0, [app_button("⚔️ PvP arena", "/pvp")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 

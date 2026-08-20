@@ -309,7 +309,7 @@ on, anyone holding the URL can mint accounts and collect the signup bonus.
 
 | Mode | Endpoint | Model |
 | --- | --- | --- |
-| PvP | `POST /api/pvp/create`, `/api/pvp/{id}/join` | pot game — your share of the pot is your chance; 5% rake |
+| PvP | `POST /api/pvp/quick-join`, `/api/pvp/{id}/join` | pot game — your share of the pot is your chance; 5% rake. Two modes, `wheel` and `ice`, run separate rounds and never share a pot |
 | Plinko | `POST /api/solo/plinko/play` | binomial slots, multipliers normalised to the configured edge |
 | Upgrade | `POST /api/solo/upgrade/play` | pick a target, win chance is `(1 − edge) / target` |
 | Lucky Buy | `POST /api/solo/lucky-buy/play` | pick a gift and your odds; stake = value × chance ÷ (1 − edge) |
@@ -370,8 +370,9 @@ Auth & profile: `POST /api/auth/telegram`, `GET /api/me`, `/api/balance`,
 `/api/profile`, `/api/transactions`, `/api/inventory`, `/api/inventory/{id}`,
 `POST /api/inventory/{id}/sell`, `/api/referrals`, `/api/fair`.
 
-PvP: `GET /api/pvp`, `POST /api/pvp/create`, `POST /api/pvp/{id}/join`,
-`GET /api/pvp/{id}`, `GET /api/pvp/{id}/state`.
+PvP: `GET /api/pvp`, `/api/pvp/current`, `/api/pvp/highlights`, `POST /api/pvp/create`,
+`POST /api/pvp/quick-join`, `POST /api/pvp/{id}/join`, `GET /api/pvp/{id}`,
+`GET /api/pvp/{id}/state`, `GET /api/pvp/{id}/replay`.
 
 Solo: `GET /api/solo/config`, `/api/solo/shop`, `/api/solo/active`, `/api/solo/history`, and
 `POST /api/solo/{plinko|upgrade|lucky-buy|hilo|ice-arena}/play`.

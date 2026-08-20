@@ -18,6 +18,7 @@ import type {
   LevelInfo,
   Page,
   PvPGame,
+  PvPMode,
   SoloGame,
   Transaction,
   User,
@@ -204,17 +205,22 @@ export const api = {
     }>("/fair"),
 
   /* ---------------------------------- PvP -------------------------------- */
-  pvpList: (params: { status?: string; limit?: number } = {}) =>
+  pvpList: (params: { status?: string; mode?: PvPMode; limit?: number } = {}) =>
     request<{ items: PvPGame[]; config: PvPConfig }>(`/pvp${query(params)}`),
   pvpGame: (id: number) => request<{ game: PvPGame }>(`/pvp/${id}`),
-  pvpCurrent: () => request<{ game: PvPGame | null; config: PvPConfig }>("/pvp/current"),
-  pvpHighlights: () => request<PvPHighlights>("/pvp/highlights"),
-  pvpQuickJoin: (amount: number, key: string) =>
+  pvpCurrent: (mode: PvPMode = "wheel") =>
+    request<{ game: PvPGame | null; config: PvPConfig; mode: PvPMode }>(
+      `/pvp/current${query({ mode })}`,
+    ),
+  pvpHighlights: (mode: PvPMode = "wheel") =>
+    request<PvPHighlights>(`/pvp/highlights${query({ mode })}`),
+  pvpQuickJoin: (amount: number, mode: PvPMode, key: string) =>
     request<{ game: PvPGame; balance: number; created: boolean }>("/pvp/quick-join", {
       method: "POST",
-      body: { amount },
+      body: { amount, mode },
       idempotencyKey: key,
     }),
+  pvpReplay: (id: number) => request<{ game: PvPGame; replay: PvPReplay }>(`/pvp/${id}/replay`),
   pvpState: (id: number, cursor = 0) =>
     request<{ game: PvPGame; events: PvPEventPayload[]; cursor: number }>(
       `/pvp/${id}/state${query({ cursor })}`,
@@ -343,6 +349,28 @@ export interface PvPHighlights {
   last: PvPHighlightEntry | null;
   top: PvPHighlightEntry | null;
   online: number;
+}
+
+export interface PvPReplayEvent {
+  at: number;
+  type: "player_joined" | "countdown" | "spin" | "finished";
+  user_id?: number;
+  name?: string;
+  avatar?: string | null;
+  amount?: number;
+  pool?: number;
+  seconds?: number;
+  winner_id?: number | null;
+  prize?: number;
+  roll?: number | null;
+}
+
+export interface PvPReplay {
+  game_id: number;
+  mode: PvPMode;
+  status: string;
+  duration: number;
+  events: PvPReplayEvent[];
 }
 
 export interface PvPEventPayload {
