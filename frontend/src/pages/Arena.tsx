@@ -97,8 +97,8 @@ export function ArenaPage() {
   return (
     <Screen>
       <div className="ticker">
-        <TickerCard label="Last round" entry={highlights.data?.last ?? null} />
-        <TickerCard label="Biggest" entry={highlights.data?.top ?? null} tone="gold" />
+        <TickerCard label="Last" entry={highlights.data?.last ?? null} />
+        <TickerCard label="Top" entry={highlights.data?.top ?? null} tone="gold" />
       </div>
 
       <div className="pool-bar">
@@ -276,7 +276,7 @@ function TickerCard({
         <span className="ticker-name">{entry.winner.name}</span>
         <span className="ticker-meta">
           {label}
-          {entry.chance !== null ? ` · ${percent(entry.chance, 0)}` : ""}
+          {entry.chance !== null ? ` · ${percent(entry.chance, 0)} chance` : ""}
         </span>
       </div>
       <span className="ticker-prize" style={{ color: tone === "gold" ? "var(--star)" : "var(--accent)" }}>
