@@ -169,22 +169,37 @@ an nginx-served frontend on `:5173`.
 Frontend, API and the bot webhook run from one project — `vercel.json` builds
 `frontend/` and routes `/api/*` to `api/index.py`.
 
+You need a managed PostgreSQL (Neon, Supabase) and Redis (Upstash) first —
+Vercel provides neither.
+
 ```bash
 npm i -g vercel && vercel login
-# set every variable from deploy/vercel-env.example in the project settings
+vercel link                                     # pick or create the project
+
+cp deploy/vercel-env.example .env.production    # fill it in (gitignored)
+./deploy/set-vercel-env.sh .env.production      # push all variables at once
 ./deploy/deploy-vercel.sh --prod
+
 cd backend && DATABASE_URL='<production url>' alembic upgrade head
 cd ../bot && python set_webhook.py https://<deployment>/api/telegram/webhook
 ```
+
+Then BotFather → `/newapp` → Web App URL = the deployment URL, and set the same
+value as `WEBAPP_URL`.
 
 Two consequences of serverless worth knowing:
 
 * **No websockets.** The Mini App detects the failed upgrade and polls
   `/api/pvp/{id}/state`, which returns the same authoritative snapshot plus the
   events published since the last cursor.
-* **No background loop.** PvP rounds and giveaway draws are driven by
-  timestamps and resolved by whichever request arrives first; `vercel.json`
-  also registers a one-minute cron on `/api/internal/tick` as the backstop.
+* **No background loop.** Nothing here depends on one: a PvP round and a
+  giveaway both carry their deadline in the database and are resolved by
+  whichever request arrives after it — under a Redis lock, so exactly once.
+  `/api/internal/tick` is only a backstop for a game nobody opens.
+
+`vercel.json` schedules that backstop daily (`0 3 * * *`) because the Hobby plan
+only allows daily crons; on Pro, change it to `* * * * *` for a tighter sweep.
+`.vercelignore` keeps the local virtualenv and `node_modules` out of the upload.
 
 For websockets and second-level timing, run the Docker stack on a VPS instead
 (`./deploy/deploy-vps.sh user@host`) and point the Mini App at that domain.

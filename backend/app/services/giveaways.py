@@ -59,14 +59,45 @@ async def list_giveaways(
             )
         ).scalars().all()
     )
-    return rows, total
+
+    # Draw any giveaway whose window closed. Doing this on read means a winner
+    # appears as soon as someone looks, rather than waiting for the next cron
+    # tick — which matters on hosts where cron only runs once a day.
+    resolved = [await finish_if_due(session, giveaway) for giveaway in rows]
+    return resolved, total
 
 
 async def get_giveaway(session: AsyncSession, giveaway_id: int) -> Giveaway:
     giveaway = await session.get(Giveaway, giveaway_id)
     if giveaway is None or giveaway.status == GiveawayStatus.DRAFT.value:
         raise NotFoundError("Giveaway not found")
-    return giveaway
+    return await finish_if_due(session, giveaway)
+
+
+def is_due(giveaway: Giveaway) -> bool:
+    return giveaway.status == GiveawayStatus.ACTIVE.value and _aware(giveaway.end_at) <= _now()
+
+
+async def finish_if_due(session: AsyncSession, giveaway: Giveaway) -> Giveaway:
+    """Resolve an expired giveaway, or return it untouched.
+
+    Safe to call from any read path: the draw itself is guarded by a Redis lock
+    and a row lock, so a hundred simultaneous readers still produce one winner.
+    """
+    if not is_due(giveaway):
+        return giveaway
+    try:
+        finished = await draw_winner(session, giveaway.id)
+        await session.commit()
+        return finished
+    except ConflictError:
+        # Another worker is drawing it right now; show the current state.
+        await session.rollback()
+        return giveaway
+    except Exception:  # pragma: no cover - a failed draw must not break the list
+        await session.rollback()
+        logger.exception("could not finish giveaway %s on read", giveaway.id)
+        return giveaway
 
 
 async def is_participant(session: AsyncSession, giveaway_id: int, user_id: int) -> bool:

@@ -117,3 +117,37 @@ async def test_creating_a_giveaway_requires_admin(client):
         headers=auth_header(auth["token"]),
     )
     assert response.status_code == 403
+
+
+async def test_expired_giveaway_is_drawn_on_read(client):
+    """No cron needed: opening an ended giveaway resolves it."""
+    admin_headers = await _admin(client)
+    now = datetime.now(UTC)
+    giveaway = await _create(
+        client,
+        admin_headers,
+        title="Already over",
+        prize_value=300,
+        start_at=(now - timedelta(hours=2)).isoformat(),
+        end_at=(now + timedelta(seconds=1)).isoformat(),
+    )
+
+    auth = await authenticate(client, 9008)
+    headers = auth_header(auth["token"])
+    assert (await client.post(f"/api/giveaways/{giveaway['id']}/join", headers=headers)).status_code == 200
+
+    # Move the deadline into the past, then simply read it.
+    await client.patch(
+        f"/api/admin/giveaways/{giveaway['id']}",
+        json={"end_at": (now - timedelta(minutes=1)).isoformat()},
+        headers=admin_headers,
+    )
+
+    detail = (await client.get(f"/api/giveaways/{giveaway['id']}", headers=headers)).json()
+    assert detail["status"] == "finished"
+    assert detail["winner_id"] == auth["user"]["id"]
+    assert (await client.get("/api/balance", headers=headers)).json()["balance"] == 1300
+
+    # And reading it again does not pay a second prize.
+    await client.get(f"/api/giveaways/{giveaway['id']}", headers=headers)
+    assert (await client.get("/api/balance", headers=headers)).json()["balance"] == 1300

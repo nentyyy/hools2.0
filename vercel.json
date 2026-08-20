@@ -1,12 +1,11 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "framework": "vite",
-  "buildCommand": "cd frontend && npm install && npm run build",
+  "framework": null,
+  "buildCommand": "cd frontend && npm install --no-audit --no-fund && npm run build",
   "outputDirectory": "frontend/dist",
-  "installCommand": "echo 'dependencies are installed per-workspace'",
+  "installCommand": "echo 'workspaces install during the build step'",
   "functions": {
     "api/index.py": {
-      "runtime": "@vercel/python@4.3.1",
       "memory": 1024,
       "maxDuration": 30
     }
@@ -19,7 +18,7 @@
   "crons": [
     {
       "path": "/api/internal/tick",
-      "schedule": "* * * * *"
+      "schedule": "0 3 * * *"
     }
   ],
   "headers": [

@@ -1,0 +1,16 @@
+# Keep the deployment upload small and free of local artefacts.
+backend/.venv
+backend/tests
+backend/pytest.ini
+frontend/node_modules
+frontend/dist
+**/__pycache__
+**/*.pyc
+.pytest_cache
+.ruff_cache
+.git
+deploy
+database/init.sql
+docker-compose.yml
+**/Dockerfile
+frontend/nginx.conf
