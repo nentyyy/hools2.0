@@ -5,6 +5,8 @@ directly, and inject their own variable names. Getting this wrong is a
 deployment that dies on the first query, so it is pinned down here.
 """
 
+import pytest
+
 from app.core.config import Settings
 
 
@@ -79,8 +81,12 @@ def test_explicit_values_win_over_platform_defaults():
     assert settings.webapp_url == "https://custom.example"
 
 
-def test_admin_ids_accept_a_csv_string():
-    assert _settings(ADMIN_TELEGRAM_IDS="1,2,3").admin_telegram_ids == [1, 2, 3]
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [("5794472585", [5794472585]), ("1,2,3", [1, 2, 3]), ("[7, 8]", [7, 8]), ("", [])],
+)
+def test_admin_ids_parse_from_every_documented_form(raw, expected):
+    assert _settings(ADMIN_TELEGRAM_IDS=raw).admin_telegram_ids == expected
 
 
 def test_bot_username_is_cleaned():

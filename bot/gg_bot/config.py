@@ -3,10 +3,12 @@ frontend bundle."""
 
 from __future__ import annotations
 
+import json
 from functools import lru_cache
+from typing import Annotated
 
-from pydantic import Field
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import Field, field_validator
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
 class BotSettings(BaseSettings):
@@ -24,11 +26,37 @@ class BotSettings(BaseSettings):
     internal_api_token: str = "change-me-internal"
 
     telegram_webhook_secret: str = ""
-    admin_telegram_ids: list[int] = Field(default_factory=list)
+    # NoDecode: pydantic-settings would otherwise try to JSON-parse the raw env
+    # value, which fails for the documented "1,2,3" form and takes the whole bot
+    # down at import time.
+    admin_telegram_ids: Annotated[list[int], NoDecode] = Field(default_factory=list)
 
     log_level: str = "INFO"
     environment: str = "development"
     request_timeout: float = 15.0
+
+    @field_validator("admin_telegram_ids", mode="before")
+    @classmethod
+    def _parse_ids(cls, value: object) -> object:
+        """Accept `1,2,3`, a JSON list, or a single bare id."""
+        if isinstance(value, str):
+            value = value.strip()
+            if not value:
+                return []
+            if value.startswith("["):
+                # NoDecode stops pydantic-settings from doing this for us.
+                return json.loads(value)
+            return [part.strip() for part in value.split(",") if part.strip()]
+        if isinstance(value, int):
+            return [value]
+        return value
+
+    @field_validator("bot_username", mode="before")
+    @classmethod
+    def _clean_username(cls, value: object) -> object:
+        if isinstance(value, str):
+            return value.strip().strip("<>").lstrip("@").strip()
+        return value
 
     @property
     def internal_base(self) -> str:
@@ -38,20 +66,9 @@ class BotSettings(BaseSettings):
         return telegram_id in self.admin_telegram_ids
 
 
-def _parse_list(raw: str | None) -> list[int]:
-    if not raw:
-        return []
-    return [int(part) for part in raw.replace("[", "").replace("]", "").split(",") if part.strip().isdigit()]
-
-
 @lru_cache
 def get_settings() -> BotSettings:
-    import os
-
-    settings = BotSettings()
-    if not settings.admin_telegram_ids:
-        settings.admin_telegram_ids = _parse_list(os.getenv("ADMIN_TELEGRAM_IDS"))
-    return settings
+    return BotSettings()
 
 
 settings = get_settings()

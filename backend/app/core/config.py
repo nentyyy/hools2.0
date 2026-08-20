@@ -6,6 +6,7 @@ bot token never leaves the backend/bot processes.
 
 from __future__ import annotations
 
+import json
 import os
 from dataclasses import dataclass
 from functools import lru_cache
@@ -112,7 +113,8 @@ class Settings(BaseSettings):
             if not value:
                 return []
             if value.startswith("["):
-                return value
+                # NoDecode stops pydantic-settings from doing this for us.
+                return json.loads(value)
             return [part.strip() for part in value.split(",") if part.strip()]
         if isinstance(value, (int, float)):
             return [value]
