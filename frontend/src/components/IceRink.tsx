@@ -35,6 +35,8 @@ const PAD = 6;
 const PUCK = 10;
 const STEPS = 460;
 const GROWTH = 1.0088;
+const CATCH_UP_MS = 1600;
+const MIN_SLIDE_MS = 600;
 
 interface Rect {
   x: number;
@@ -177,6 +179,11 @@ export function IceRink({ players, totalPool, winningRoll, spinAt, spinSeconds, 
     context.scale(dpr, dpr);
 
     const endsAt = spinAt ? new Date(spinAt).getTime() + spinSeconds * 1000 : 0;
+    // Whatever is left of the round's own window, or a short catch-up when the
+    // result reached this client late.
+    const left = endsAt - Date.now();
+    const slideMs = left > MIN_SLIDE_MS ? Math.min(left, spinSeconds * 1000) : CATCH_UP_MS;
+    const startedAt = performance.now();
 
     const avatarFor = (url: string): HTMLImageElement | null => {
       const cached = images.current.get(url);
@@ -286,9 +293,7 @@ export function IceRink({ players, totalPool, winningRoll, spinAt, spinSeconds, 
 
       let animating = false;
       if (trail) {
-        const remaining = endsAt - Date.now();
-        const progress =
-          spinSeconds > 0 ? Math.min(Math.max(1 - remaining / (spinSeconds * 1000), 0), 1) : 1;
+        const progress = Math.min(Math.max((performance.now() - startedAt) / slideMs, 0), 1);
         const eased = 1 - (1 - progress) ** 2;
         const index = Math.min(trail.length - 1, Math.floor(eased * (trail.length - 1)));
         const puck = trail[index];

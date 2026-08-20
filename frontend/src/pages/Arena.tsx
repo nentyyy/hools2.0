@@ -42,7 +42,12 @@ export function ArenaPage() {
   const current = useQuery({
     queryKey: ["pvp", "current"],
     queryFn: api.pvpCurrent,
-    refetchInterval: 3000,
+    // The draw is published when the spin starts, so the closer a round is to
+    // resolving the more it matters that we hear about it promptly.
+    refetchInterval: (query) => {
+      const status = query.state.data?.game?.status;
+      return status === "starting" || status === "spinning" ? 1000 : 3000;
+    },
   });
   const highlights = useQuery({
     queryKey: ["pvp", "highlights"],

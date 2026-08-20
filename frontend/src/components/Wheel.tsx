@@ -26,6 +26,11 @@ const RADIUS = 142;
 const HOLE = 78;
 const AVATAR_RING = (RADIUS + HOLE) / 2;
 const FULL_TURNS = 6;
+// A client that polls can learn the result after the spin window has closed.
+// Landing instantly reads as "the wheel is broken", so a late arrival still
+// gets a short spin rather than a jump.
+const CATCH_UP_MS = 1400;
+const MIN_SPIN_MS = 600;
 
 interface Props {
   players: PvPPlayer[];
@@ -100,9 +105,10 @@ export function Wheel({
     // Bring the winning point to the pointer at the top.
     const target = FULL_TURNS * 360 - winningRoll * 360;
     const endsAt = spinAt ? new Date(spinAt).getTime() + spinSeconds * 1000 : Date.now();
-    const remaining = Math.max(0, Math.min(endsAt - Date.now(), spinSeconds * 1000));
+    const remaining = Math.min(endsAt - Date.now(), spinSeconds * 1000);
+    const duration = remaining > MIN_SPIN_MS ? remaining : CATCH_UP_MS;
 
-    setDuration(remaining);
+    setDuration(duration);
     // Two frames: the first commits the starting rotation, the second animates.
     requestAnimationFrame(() => requestAnimationFrame(() => setRotation(target)));
   }, [winningRoll, spinAt, spinSeconds]);
