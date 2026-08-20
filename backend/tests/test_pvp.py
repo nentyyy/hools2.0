@@ -164,3 +164,28 @@ async def test_highlights_report_the_last_and_biggest_rounds(client):
     if body["last"]:
         assert body["last"]["winner"]["name"]
         assert body["last"]["prize"] > 0
+
+
+async def test_the_draw_is_published_when_the_spin_starts(client):
+    """Clients need the result before the animation, not after it."""
+    host, _ = await _login(client, 7107)
+    guest, _ = await _login(client, 7108)
+
+    game_id = (await client.post("/api/pvp/create", json={"amount": 100}, headers=host)).json()["game"]["id"]
+    joined = await client.post(f"/api/pvp/{game_id}/join", json={"amount": 100}, headers=guest)
+    assert joined.json()["game"]["winning_roll"] is None, "nothing is drawn while players can still join"
+
+    # Countdown is 1s in tests and the spin 1s: land in the middle of the spin.
+    await asyncio.sleep(1.3)
+    spinning = (await client.get(f"/api/pvp/{game_id}", headers=host)).json()["game"]
+    assert spinning["status"] == "spinning"
+    roll = spinning["winning_roll"]
+    assert roll is not None and 0 <= roll < 1
+    assert spinning["server_seed"] is None, "the seed stays hidden until the round ends"
+
+    await asyncio.sleep(1.4)
+    settled = (await client.get(f"/api/pvp/{game_id}", headers=host)).json()["game"]
+    assert settled["status"] == "finished"
+    # Settlement must land on the number that was already published.
+    assert settled["winning_roll"] == roll
+    assert settled["server_seed"]

@@ -315,6 +315,14 @@ async def _advance(session: AsyncSession, game: PvPGame, *, notify: bool) -> Non
     spin_at = _aware(game.spin_at)
     if game.status == PvPStatus.STARTING.value and spin_at and now >= spin_at:
         game.status = PvPStatus.SPINNING.value
+        # Publish the drawn ticket as the spin starts. The outcome is already
+        # fixed by the seed at this point — joins are closed — and settlement
+        # recomputes the very same number. Revealing it here is what lets every
+        # client animate the same landing and finish together, instead of
+        # learning the answer only once the animation window has passed.
+        game.winning_roll = rng.single_float(
+            game.server_seed or "", game.client_seed, game.nonce or game.id
+        )
         if notify:
             await publish_pvp_event(
                 game.id,

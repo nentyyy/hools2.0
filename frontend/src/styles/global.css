@@ -818,3 +818,63 @@ a { color: var(--accent); text-decoration: none; }
   width: 100%;
   height: min(52vh, 380px);
 }
+
+/* ---------- ice rink ---------- */
+.rink-stage {
+  position: relative;
+  width: 100%;
+  margin: var(--sp-2) auto 0;
+}
+.rink-canvas { width: 100%; display: block; }
+/* The rink states its business above the boards, the way a scoreboard does. */
+.rink-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  min-height: 34px;
+  margin-bottom: var(--sp-2);
+}
+.rink-status .headline {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.rink-status .sub { font-size: 11px; color: var(--text-faint); }
+.rink-status .avatar { width: 26px; height: 26px; font-size: 11px; }
+
+.rink-center {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  text-align: center;
+  pointer-events: none;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.9);
+}
+
+.view-switch {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: var(--r-full);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+}
+.view-switch button {
+  flex: 1;
+  height: 30px;
+  border-radius: var(--r-full);
+  font-size: 12px;
+  font-weight: 650;
+  color: var(--text-faint);
+  transition: background 140ms var(--ease), color 140ms var(--ease);
+}
+.view-switch button[data-active="true"] {
+  background: var(--surface-3);
+  color: var(--text);
+}

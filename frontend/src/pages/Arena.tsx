@@ -14,6 +14,7 @@ import { useNavigate } from "react-router-dom";
 import type { PvPGame } from "@shared/index";
 
 import { HistoryIcon, UsersIcon } from "@/components/icons";
+import { IceRink } from "@/components/IceRink";
 import { PLAYER_COLORS, Wheel } from "@/components/Wheel";
 import { Avatar, Screen } from "@/components/ui";
 import { api, newIdempotencyKey, type PvPHighlightEntry } from "@/lib/api";
@@ -33,6 +34,10 @@ export function ArenaPage() {
 
   const [bet, setBet] = useState(100);
   const [announced, setAnnounced] = useState<number | null>(null);
+  // Two ways to watch the same round; the choice is remembered per device.
+  const [view, setView] = useState<"wheel" | "ice">(
+    () => (localStorage.getItem("gg.arena-view") as "wheel" | "ice") ?? "wheel",
+  );
 
   const current = useQuery({
     queryKey: ["pvp", "current"],
@@ -84,6 +89,7 @@ export function ArenaPage() {
   }, [game, announced, joined, user?.id, refresh, queryClient, toast]);
 
   const winner = game?.players.find((player) => player.user_id === game.winner_id) ?? null;
+  const status = <ArenaStatus game={game} winner={winner} secondsLeft={secondsLeft} />;
   const spinning = game?.status === "spinning";
   const settled = game === null || game.status === "finished" || game.status === "cancelled";
   const affordable = bet <= (user?.balance ?? 0);
@@ -109,45 +115,44 @@ export function ArenaPage() {
         </div>
       </div>
 
-      <Wheel
-        players={game?.players ?? []}
-        totalPool={game?.total_pool ?? 0}
-        winningRoll={game?.status === "finished" || spinning ? game?.winning_roll ?? null : null}
-        spinAt={game?.spin_at ?? null}
-        spinSeconds={game?.spin_seconds ?? 6}
-        spinning={spinning}
-      >
-        {game?.status === "starting" ? (
-          <>
-            <span className="headline">{secondsLeft}</span>
-            <span className="sub">starting</span>
-          </>
-        ) : spinning ? (
-          <>
-            <span className="headline" style={{ fontSize: 20 }}>
-              Drawing
-            </span>
-            <span className="sub">{game.players.length} players</span>
-          </>
-        ) : game?.status === "finished" && winner ? (
-          <>
-            <Avatar src={winner.avatar} name={winner.name} />
-            <span className="headline" style={{ fontSize: 18, color: "var(--win)" }}>
-              {gg(game.prize)}
-            </span>
-            <span className="sub">{percent(winner.chance, 0)} chance</span>
-          </>
-        ) : (
-          <>
-            <span className="headline" style={{ fontSize: 20 }}>
-              Waiting
-            </span>
-            <span className="sub">
-              {game?.players.length === 1 ? "one more player" : "place your bet"}
-            </span>
-          </>
-        )}
-      </Wheel>
+      <div className="view-switch">
+        {(["wheel", "ice"] as const).map((value) => (
+          <button
+            key={value}
+            data-active={view === value}
+            onClick={() => {
+              haptics.select();
+              setView(value);
+              localStorage.setItem("gg.arena-view", value);
+            }}
+          >
+            {value === "wheel" ? "Wheel" : "Ice arena"}
+          </button>
+        ))}
+      </div>
+
+      {view === "wheel" ? (
+        <Wheel
+          players={game?.players ?? []}
+          totalPool={game?.total_pool ?? 0}
+          winningRoll={game?.status === "finished" || spinning ? game?.winning_roll ?? null : null}
+          spinAt={game?.spin_at ?? null}
+          spinSeconds={game?.spin_seconds ?? 6}
+          spinning={spinning}
+        >
+          {status}
+        </Wheel>
+      ) : (
+        <IceRink
+          players={game?.players ?? []}
+          totalPool={game?.total_pool ?? 0}
+          winningRoll={game?.status === "finished" || spinning ? game?.winning_roll ?? null : null}
+          spinAt={game?.spin_at ?? null}
+          spinSeconds={game?.spin_seconds ?? 6}
+        >
+          {status}
+        </IceRink>
+      )}
 
       {game?.status === "finished" && winner ? (
         <div className="winner-banner">
@@ -278,5 +283,54 @@ function TickerCard({
         +{gg(entry.prize)}
       </span>
     </div>
+  );
+}
+
+
+function ArenaStatus({
+  game,
+  winner,
+  secondsLeft,
+}: {
+  game: PvPGame | null;
+  winner: { name: string; avatar: string | null; chance: number } | null;
+  secondsLeft: number;
+}) {
+  if (game?.status === "starting") {
+    return (
+      <>
+        <span className="headline">{secondsLeft}</span>
+        <span className="sub">starting</span>
+      </>
+    );
+  }
+  if (game?.status === "spinning") {
+    return (
+      <>
+        <span className="headline" style={{ fontSize: 20 }}>
+          Drawing
+        </span>
+        <span className="sub">{game.players.length} players</span>
+      </>
+    );
+  }
+  if (game?.status === "finished" && winner) {
+    return (
+      <>
+        <Avatar src={winner.avatar} name={winner.name} />
+        <span className="headline" style={{ fontSize: 18, color: "var(--win)" }}>
+          {gg(game.prize)}
+        </span>
+        <span className="sub">{percent(winner.chance, 0)} chance</span>
+      </>
+    );
+  }
+  return (
+    <>
+      <span className="headline" style={{ fontSize: 20 }}>
+        Waiting
+      </span>
+      <span className="sub">{game?.players.length === 1 ? "one more player" : "place your bet"}</span>
+    </>
   );
 }
