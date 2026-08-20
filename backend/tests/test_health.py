@@ -45,14 +45,14 @@ async def test_health_flags_a_schema_left_behind(client, session):
 async def test_a_missing_column_is_reported_as_an_outdated_schema():
     """PostgreSQL 42703 means the query named a column the database lacks."""
 
-    class MissingColumn(Exception):
+    class MissingColumnError(Exception):
         sqlstate = "42703"
 
     app = create_app()
     handler = app.exception_handlers[SQLAlchemyError]
 
     error = SQLAlchemyError("column pvp_games.mode does not exist")
-    error.orig = MissingColumn()
+    error.orig = MissingColumnError()
     response = handler(None, error)
     body = await response if hasattr(response, "__await__") else response
 
