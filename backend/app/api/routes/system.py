@@ -21,23 +21,73 @@ router = APIRouter(tags=["system"])
 
 @router.get("/health")
 async def health(session: SessionDep) -> dict:
+    """Readiness report.
+
+    Deliberately detailed: this is the first URL to open when a deployment
+    misbehaves, and it answers the three questions that actually matter — can
+    the API reach its stores, has the schema been applied, and is anything
+    required left unconfigured. It reports names and booleans only, never
+    values.
+    """
     checks: dict[str, str] = {}
+    revision: str | None = None
+
     try:
         await session.execute(text("SELECT 1"))
         checks["database"] = "ok"
-    except Exception as exc:  # pragma: no cover
+        try:
+            revision = await session.scalar(text("SELECT version_num FROM alembic_version LIMIT 1"))
+            checks["migrations"] = "ok" if revision else "not applied"
+        except Exception:
+            await session.rollback()
+            checks["migrations"] = "not applied"
+    except Exception as exc:
         checks["database"] = f"error: {exc.__class__.__name__}"
+        checks["migrations"] = "unknown"
+
     try:
         await get_redis().ping()
         checks["redis"] = "ok"
-    except Exception as exc:  # pragma: no cover
+    except Exception as exc:
         checks["redis"] = f"error: {exc.__class__.__name__}"
 
-    healthy = all(v == "ok" for v in checks.values())
+    def configured(value: str, placeholder: str) -> str:
+        """A value left at its .env.example default counts as unconfigured."""
+        return "" if value == placeholder else value
+
+    missing = [
+        name
+        for name, value in (
+            ("BOT_TOKEN", settings.bot_token),
+            ("BOT_USERNAME", settings.bot_username),
+            ("JWT_SECRET", configured(settings.jwt_secret, "change-me")),
+            ("INTERNAL_API_TOKEN", configured(settings.internal_api_token, "change-me-internal")),
+            ("CRON_SECRET", configured(settings.cron_secret, "change-me-cron")),
+        )
+        if not value
+    ]
+
+    healthy = checks.get("database") == "ok" and checks.get("redis") == "ok"
+    ready = healthy and checks.get("migrations") == "ok"
+
     return {
-        "status": "ok" if healthy else "degraded",
+        "status": "ok" if ready else "degraded" if healthy else "error",
         "environment": settings.environment,
         "checks": checks,
+        "schema_revision": revision,
+        "config": {
+            "missing": missing,
+            "admin_ids": len(settings.admin_telegram_ids),
+            "browser_login": settings.allow_browser_login,
+            "webapp_url": settings.webapp_url,
+        },
+        "hint": (
+            None
+            if ready
+            else "Run /api/internal/setup?token=<CRON_SECRET> to apply migrations and register the bot webhook"
+            if checks.get("migrations") != "ok"
+            else "Check the failing store above"
+        ),
     }
 
 

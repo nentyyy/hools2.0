@@ -79,7 +79,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         }
       } catch (err) {
         if (cancelled) return;
-        setError(err instanceof Error ? err.message : "Sign-in failed");
+        if (err instanceof ApiError) {
+          const status = err.status ? ` · HTTP ${err.status}` : "";
+          setError(`${err.message} (${err.code}${status})`);
+        } else {
+          setError(err instanceof Error ? err.message : "Sign-in failed");
+        }
         setStatus("error");
       }
     }

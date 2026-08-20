@@ -17,6 +17,7 @@ from contextlib import asynccontextmanager
 from typing import Any
 
 from redis.asyncio import Redis, from_url
+from redis.exceptions import RedisError
 
 from app.core.config import settings
 from app.core.errors import ConflictError
@@ -96,13 +97,23 @@ async def idempotency_begin(key: str, ttl: int = 86400) -> dict[str, Any] | None
     Returns None when the caller owns the key and should run the operation,
     or the stored response when the request was already processed. Raises
     ConflictError while an identical request is still in flight.
+
+    If Redis is unavailable the caller proceeds without the replay cache: the
+    unique constraints on `transactions.idempotency_key`, the PvP seat and the
+    giveaway entry are what actually prevent a double spend, so degrading here
+    costs a convenience, not a guarantee.
     """
     redis = get_redis()
-    claimed = await redis.set(f"idem:{key}", json.dumps({"status": "in_progress"}), nx=True, ex=ttl)
-    if claimed:
+    try:
+        claimed = await redis.set(f"idem:{key}", json.dumps({"status": "in_progress"}), nx=True, ex=ttl)
+        if claimed:
+            return None
+
+        raw = await redis.get(f"idem:{key}")
+    except RedisError:
+        logger.warning("idempotency store unavailable, relying on database constraints", exc_info=True)
         return None
 
-    raw = await redis.get(f"idem:{key}")
     if not raw:
         return None
     stored = json.loads(raw)
@@ -112,27 +123,41 @@ async def idempotency_begin(key: str, ttl: int = 86400) -> dict[str, Any] | None
 
 
 async def idempotency_store(key: str, response: Any, ttl: int = 86400) -> None:
-    await get_redis().set(
-        f"idem:{key}", json.dumps({"status": "done", "response": response}, default=str), ex=ttl
-    )
+    try:
+        await get_redis().set(
+            f"idem:{key}", json.dumps({"status": "done", "response": response}, default=str), ex=ttl
+        )
+    except RedisError:
+        logger.warning("could not cache idempotent response for %s", key)
 
 
 async def idempotency_release(key: str) -> None:
     """Drop the claim when the operation failed, so the client may retry."""
-    await get_redis().delete(f"idem:{key}")
+    try:
+        await get_redis().delete(f"idem:{key}")
+    except RedisError:
+        logger.warning("could not release idempotency key %s", key)
 
 
 async def rate_limit_hit(bucket: str, limit: int, window: int) -> tuple[bool, int]:
-    """Fixed-window counter. Returns (allowed, retry_after_seconds)."""
+    """Fixed-window counter. Returns (allowed, retry_after_seconds).
+
+    Fails open: a rate limiter that cannot reach Redis must not take the whole
+    API down with it, and every endpoint behind it has its own authorisation.
+    """
     redis = get_redis()
     key = f"rl:{bucket}"
-    pipe = redis.pipeline()
-    pipe.incr(key)
-    pipe.ttl(key)
-    count, ttl = await pipe.execute()
-    if count == 1 or ttl < 0:
-        await redis.expire(key, window)
-        ttl = window
+    try:
+        pipe = redis.pipeline()
+        pipe.incr(key)
+        pipe.ttl(key)
+        count, ttl = await pipe.execute()
+        if count == 1 or ttl < 0:
+            await redis.expire(key, window)
+            ttl = window
+    except RedisError:
+        logger.warning("rate limiter unavailable, allowing the request", exc_info=True)
+        return True, 1
     return count <= limit, max(int(ttl), 1)
 
 
