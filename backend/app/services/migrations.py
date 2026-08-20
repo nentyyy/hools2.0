@@ -49,6 +49,33 @@ async def _current_revision(conn) -> str | None:
         return None  # the table does not exist yet — nothing has been applied
 
 
+def head_revision() -> str | None:
+    """The newest revision this build ships."""
+    try:
+        from alembic.script import ScriptDirectory
+
+        return ScriptDirectory.from_config(_alembic_config()).get_current_head()
+    except Exception:  # pragma: no cover - only if the versions folder is missing
+        logger.warning("could not read the migration head", exc_info=True)
+        return None
+
+
+async def status() -> dict:
+    """Compare what the database has applied against what this build expects."""
+    head = head_revision()
+    try:
+        async with engine.connect() as conn:
+            current = await _current_revision(conn)
+    except Exception as exc:
+        return {"state": "unknown", "current": None, "head": head, "error": exc.__class__.__name__}
+
+    if current is None:
+        return {"state": "not_applied", "current": None, "head": head}
+    if head and current != head:
+        return {"state": "outdated", "current": current, "head": head}
+    return {"state": "ok", "current": current, "head": head}
+
+
 async def upgrade(revision: str = "head") -> dict:
     """Apply migrations. Returns what changed, or `busy` if another run holds the lock."""
     async with engine.connect() as conn:

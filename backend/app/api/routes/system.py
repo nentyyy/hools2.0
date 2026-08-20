@@ -33,15 +33,19 @@ async def health(session: SessionDep) -> dict:
     checks: dict[str, str] = {}
     revision: str | None = None
 
+    head: str | None = None
     try:
         await session.execute(text("SELECT 1"))
         checks["database"] = "ok"
-        try:
-            revision = await session.scalar(text("SELECT version_num FROM alembic_version LIMIT 1"))
-            checks["migrations"] = "ok" if revision else "not applied"
-        except Exception:
-            await session.rollback()
-            checks["migrations"] = "not applied"
+
+        schema = await migrations_service.status()
+        revision = schema["current"]
+        head = schema["head"]
+        checks["migrations"] = {
+            "ok": "ok",
+            "not_applied": "not applied",
+            "outdated": f"outdated ({schema['current']} → {schema['head']})",
+        }.get(schema["state"], "unknown")
     except Exception as exc:
         checks["database"] = f"error: {exc.__class__.__name__}"
         checks["migrations"] = "unknown"
@@ -76,6 +80,7 @@ async def health(session: SessionDep) -> dict:
         "environment": settings.environment,
         "checks": checks,
         "schema_revision": revision,
+        "schema_head": head,
         "config": {
             "missing": missing,
             "admin_ids": len(settings.admin_telegram_ids),

@@ -101,6 +101,18 @@ def register_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(SQLAlchemyError)
     async def _db_error(_: Request, exc: SQLAlchemyError) -> JSONResponse:
         logger.exception("database_error", exc_info=exc)
+        # 42703/42P01: the query names a column or table the database does not
+        # have, which in practice means the deployment is ahead of its schema.
+        # That is worth naming, because "storage is unavailable" sends the
+        # operator looking at the database instead of at the migrations.
+        code = getattr(getattr(exc, "orig", None), "sqlstate", None)
+        if code in {"42703", "42P01"}:
+            return _error(
+                status.HTTP_503_SERVICE_UNAVAILABLE,
+                "schema_outdated",
+                "Database schema is out of date — apply the migrations "
+                "(GET /api/internal/setup?token=<CRON_SECRET>)",
+            )
         return _error(status.HTTP_503_SERVICE_UNAVAILABLE, "database_error", "Storage is unavailable")
 
     @app.exception_handler(Exception)
