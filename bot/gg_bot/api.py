@@ -19,12 +19,54 @@ class BackendError(Exception):
         self.status_code = status_code
 
 
+_client: httpx.AsyncClient | None = None
+
+
+def _build_client() -> httpx.AsyncClient:
+    """Talk to the backend the cheapest way available.
+
+    When the bot runs inside the backend process — which is how webhook mode
+    works on a single serverless deployment — there is no loopback address to
+    call, and going out over the public URL would spend a second invocation per
+    button press. So if the FastAPI app is importable, requests are handed
+    straight to it in memory. A separate bot process (docker, polling) falls
+    back to ordinary HTTP against BACKEND_URL.
+    """
+    try:
+        from app.main import app as backend_app
+
+        logger.info("using the in-process backend transport")
+        return httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=backend_app),
+            base_url="http://backend",
+            timeout=settings.request_timeout,
+        )
+    except Exception:
+        logger.info("using the network backend transport: %s", settings.backend_url)
+        return httpx.AsyncClient(
+            base_url=settings.backend_url.rstrip("/"), timeout=settings.request_timeout
+        )
+
+
+def get_client() -> httpx.AsyncClient:
+    global _client
+    if _client is None:
+        _client = _build_client()
+    return _client
+
+
+async def close_client() -> None:
+    global _client
+    if _client is not None:
+        await _client.aclose()
+        _client = None
+
+
 async def _request(method: str, path: str, **kwargs: Any) -> Any:
-    url = f"{settings.internal_base}{path}"
+    url = f"{settings.api_prefix}{path}"
     headers = {"X-Internal-Token": settings.internal_api_token, **kwargs.pop("headers", {})}
     try:
-        async with httpx.AsyncClient(timeout=settings.request_timeout) as client:
-            response = await client.request(method, url, headers=headers, **kwargs)
+        response = await get_client().request(method, url, headers=headers, **kwargs)
     except httpx.HTTPError as exc:
         logger.error("backend unreachable: %s", exc)
         raise BackendError("Backend is unreachable") from exc

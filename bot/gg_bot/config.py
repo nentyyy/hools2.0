@@ -4,11 +4,14 @@ frontend bundle."""
 from __future__ import annotations
 
 import json
+import os
 from functools import lru_cache
 from typing import Annotated
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
+
+_DEFAULT_BACKEND_URL = "http://localhost:8000"
 
 
 class BotSettings(BaseSettings):
@@ -21,7 +24,7 @@ class BotSettings(BaseSettings):
     webapp_url: str = "http://localhost:5173"
 
     # The bot owns no database: everything goes through the backend's internal API.
-    backend_url: str = "http://localhost:8000"
+    backend_url: str = _DEFAULT_BACKEND_URL
     api_prefix: str = "/api"
     internal_api_token: str = "change-me-internal"
 
@@ -68,7 +71,15 @@ class BotSettings(BaseSettings):
 
 @lru_cache
 def get_settings() -> BotSettings:
-    return BotSettings()
+    settings = BotSettings()
+    # A separate bot process on a managed host has no localhost backend to call.
+    if settings.backend_url == _DEFAULT_BACKEND_URL:
+        for name in ("VERCEL_PROJECT_PRODUCTION_URL", "VERCEL_URL"):
+            value = os.getenv(name)
+            if value:
+                settings.backend_url = value if value.startswith("http") else f"https://{value}"
+                break
+    return settings
 
 
 settings = get_settings()
