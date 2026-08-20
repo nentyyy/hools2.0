@@ -5,9 +5,10 @@ import { Layout } from "@/components/Layout";
 import { TopUpSheet } from "@/components/TopUpSheet";
 import { Screen } from "@/components/ui";
 import { useSession } from "@/lib/session";
+import { ArenaPage } from "@/pages/Arena";
 import { GiveawaysPage } from "@/pages/Giveaways";
-import { HomePage } from "@/pages/Home";
 import { ProfilePage } from "@/pages/Profile";
+import { PvpHistoryPage } from "@/pages/PvpHistory";
 import { PvpRoomPage } from "@/pages/PvpRoom";
 import { SoloPage } from "@/pages/Solo";
 import { HiLoPage } from "@/pages/solo/HiLo";
@@ -59,8 +60,9 @@ export default function App() {
     <>
       <Routes>
         <Route element={<Layout onTopUp={() => setTopUp(true)} />}>
-          <Route path="/" element={<HomePage />} />
+          <Route path="/" element={<ArenaPage />} />
           <Route path="/pvp" element={<Navigate to="/" replace />} />
+          <Route path="/pvp/history" element={<PvpHistoryPage />} />
           <Route path="/pvp/:id" element={<PvpRoomPage />} />
           <Route path="/solo" element={<SoloPage />} />
           <Route path="/solo/plinko" element={<PlinkoPage />} />

@@ -7,13 +7,14 @@ import { gg } from "@/lib/format";
 import { useSession } from "@/lib/session";
 import { backButton, haptics } from "@/lib/telegram";
 
+import { DiceIcon, GiftIcon, SwordsIcon, UserIcon } from "./icons";
 import { Avatar } from "./ui";
 
 const TABS = [
-  { path: "/", icon: "⚔️", label: "PvP" },
-  { path: "/solo", icon: "🎲", label: "Solo" },
-  { path: "/giveaways", icon: "🎁", label: "Drops" },
-  { path: "/profile", icon: "👤", label: "Profile" },
+  { path: "/", Icon: SwordsIcon, label: "PvP" },
+  { path: "/solo", Icon: DiceIcon, label: "Solo" },
+  { path: "/giveaways", Icon: GiftIcon, label: "Drops" },
+  { path: "/profile", Icon: UserIcon, label: "Profile" },
 ];
 
 export function Layout({ onTopUp }: { onTopUp: () => void }) {
@@ -58,7 +59,7 @@ export function Layout({ onTopUp }: { onTopUp: () => void }) {
             data-active={location.pathname === tab.path}
             onClick={() => haptics.select()}
           >
-            <span className="tab-icon">{tab.icon}</span>
+            <tab.Icon size={21} />
             {tab.label}
           </Link>
         ))}

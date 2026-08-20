@@ -2,9 +2,10 @@
  *  screen replays them. */
 
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useState } from "react";
 
 import { BetInput } from "@/components/BetInput";
+import { PlinkoBoard } from "@/components/PlinkoBoard";
 import { Card, Screen, SectionTitle } from "@/components/ui";
 import { api, newIdempotencyKey, type SoloPlayResponse } from "@/lib/api";
 import { gg, multiplier } from "@/lib/format";
@@ -21,6 +22,13 @@ interface PlinkoResult {
   multipliers: number[];
 }
 
+interface Drop {
+  id: number;
+  result: PlinkoResult;
+  bet: number;
+  reward: number;
+}
+
 export function PlinkoPage() {
   const toast = useToast();
   const { user, setBalance } = useSession();
@@ -28,89 +36,65 @@ export function PlinkoPage() {
   const [bet, setBet] = useState(100);
   const [rows, setRows] = useState(12);
   const [risk, setRisk] = useState<"low" | "medium" | "high">("medium");
-  const [result, setResult] = useState<PlinkoResult | null>(null);
-  const [step, setStep] = useState(-1);
-  const [reward, setReward] = useState<number | null>(null);
-  const timers = useRef<number[]>([]);
+  const [drop, setDrop] = useState<Drop | null>(null);
+  const [outcome, setOutcome] = useState<Drop | null>(null);
 
   const { data: config } = useQuery({ queryKey: ["solo", "config"], queryFn: api.soloConfig });
-  const table = config?.plinko.tables[`${rows}:${risk}`] ?? result?.multipliers ?? [];
-
-  useEffect(() => () => timers.current.forEach(window.clearTimeout), []);
+  const table = config?.plinko.tables[`${rows}:${risk}`] ?? drop?.result.multipliers ?? [];
 
   const play = useMutation({
     mutationFn: () => api.playPlinko({ bet, rows, risk }, newIdempotencyKey()),
     onSuccess: (response: SoloPlayResponse) => {
-      const payload = response.game.result as unknown as PlinkoResult;
+      const result = response.game.result as unknown as PlinkoResult;
       setBalance(response.balance);
-      setResult(payload);
-      setReward(null);
-      setStep(-1);
-
-      // Replay the server's path one peg row at a time.
-      timers.current.forEach(window.clearTimeout);
-      timers.current = payload.path.map((_, index) =>
-        window.setTimeout(() => {
-          setStep(index);
-          haptics.tap("light");
-        }, 90 * (index + 1)),
-      );
-      timers.current.push(
-        window.setTimeout(
-          () => {
-            setReward(response.game.reward);
-            if (response.game.reward > bet) haptics.win();
-            else if (response.game.reward === 0) haptics.lose();
-          },
-          90 * (payload.path.length + 1),
-        ),
-      );
+      setOutcome(null);
+      setDrop({ id: response.game.id, result, bet: response.game.bet, reward: response.game.reward });
+      haptics.tap("light");
     },
     onError: (error: Error) => toast.error(error.message),
   });
 
+  // Fired by the board the moment the ball settles, so the payout lands with it.
+  const handleLanded = useCallback(() => {
+    setDrop((current) => {
+      if (!current) return current;
+      setOutcome(current);
+      if (current.reward > current.bet) haptics.win();
+      else if (current.reward === 0) haptics.lose();
+      else haptics.tap("medium");
+      return current;
+    });
+  }, []);
+
+  const reset = () => {
+    setDrop(null);
+    setOutcome(null);
+  };
+
   return (
     <Screen>
-      <h1>Plinko</h1>
-
-      <div className="stage">
-        <div className="peg-grid">
-          {Array.from({ length: rows }, (_, rowIndex) => (
-            <div key={rowIndex} className="peg-row">
-              {Array.from({ length: rowIndex + 2 }, (_, pegIndex) => (
-                <span
-                  key={pegIndex}
-                  className="peg"
-                  data-lit={
-                    result !== null &&
-                    step >= rowIndex &&
-                    pegIndex === result.path.slice(0, rowIndex + 1).filter((s) => s === "R").length
-                  }
-                />
-              ))}
-            </div>
-          ))}
-        </div>
-
-        <div className="plinko-slots">
-          {table.map((value, index) => (
-            <div
-              key={index}
-              className="plinko-slot num"
-              data-hit={reward !== null && result?.slot === index}
-            >
-              {value.toFixed(value >= 10 ? 0 : 1)}×
-            </div>
-          ))}
-        </div>
+      <div className="row-between">
+        <h1>Plinko</h1>
+        {outcome ? (
+          <strong
+            className="num"
+            style={{ color: outcome.reward > outcome.bet ? "var(--win)" : "var(--text-dim)" }}
+          >
+            {multiplier(outcome.result.multiplier)} · {outcome.reward > 0 ? `+${gg(outcome.reward)}` : `−${gg(outcome.bet)}`}
+          </strong>
+        ) : null}
       </div>
 
-      {reward !== null && result ? (
-        <div className="result" data-outcome={reward > bet ? "win" : "lose"}>
-          <span className="faint">{multiplier(result.multiplier)}</span>
-          <span className="amount num">{reward > 0 ? `+${gg(reward)}` : `−${gg(bet)}`} GG</span>
-        </div>
-      ) : null}
+      <div className="stage" style={{ padding: "var(--sp-2)" }}>
+        <PlinkoBoard
+          rows={rows}
+          multipliers={table}
+          path={drop?.result.path ?? null}
+          slot={drop?.result.slot ?? null}
+          playId={drop?.id ?? 0}
+          onLanded={handleLanded}
+        />
+      </div>
 
       <Card>
         <SectionTitle>Rows</SectionTitle>
@@ -120,11 +104,11 @@ export function PlinkoPage() {
               key={value}
               className="chip"
               data-active={rows === value}
+              disabled={play.isPending}
               onClick={() => {
                 haptics.select();
                 setRows(value);
-                setResult(null);
-                setReward(null);
+                reset();
               }}
             >
               {value}
@@ -139,9 +123,11 @@ export function PlinkoPage() {
               key={value}
               className="chip"
               data-active={risk === value}
+              disabled={play.isPending}
               onClick={() => {
                 haptics.select();
                 setRisk(value);
+                reset();
               }}
             >
               {value}

@@ -12,6 +12,7 @@ import asyncio
 import json
 import logging
 import secrets
+import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any
@@ -139,7 +140,22 @@ async def idempotency_release(key: str) -> None:
         logger.warning("could not release idempotency key %s", key)
 
 
-async def rate_limit_hit(bucket: str, limit: int, window: int) -> tuple[bool, int]:
+PRESENCE_KEY = "presence:online"
+PRESENCE_WINDOW = 300
+
+
+async def online_count(window: int = PRESENCE_WINDOW) -> int:
+    """How many players were active in the last `window` seconds."""
+    try:
+        now = int(time.time())
+        return int(await get_redis().zcount(PRESENCE_KEY, now - window, "+inf"))
+    except RedisError:
+        return 0
+
+
+async def rate_limit_hit(
+    bucket: str, limit: int, window: int, *, presence_id: str | None = None
+) -> tuple[bool, int]:
     """Fixed-window counter. Returns (allowed, retry_after_seconds).
 
     Fails open: a rate limiter that cannot reach Redis must not take the whole
@@ -148,10 +164,15 @@ async def rate_limit_hit(bucket: str, limit: int, window: int) -> tuple[bool, in
     redis = get_redis()
     key = f"rl:{bucket}"
     try:
+        now = int(time.time())
         pipe = redis.pipeline()
         pipe.incr(key)
         pipe.ttl(key)
-        count, ttl = await pipe.execute()
+        if presence_id:
+            # Presence rides along on a round trip we are making anyway.
+            pipe.zadd(PRESENCE_KEY, {presence_id: now})
+            pipe.zremrangebyscore(PRESENCE_KEY, "-inf", now - PRESENCE_WINDOW)
+        count, ttl, *_ = await pipe.execute()
         if count == 1 or ttl < 0:
             await redis.expire(key, window)
             ttl = window

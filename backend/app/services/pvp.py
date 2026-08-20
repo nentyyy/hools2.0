@@ -209,6 +209,75 @@ async def join_game(
     return game
 
 
+def _join_grace() -> timedelta:
+    """How close to the draw a round stops accepting new players.
+
+    Scaled to the countdown so it behaves the same whether a round takes twenty
+    seconds or one: joining as the wheel starts is what we want to avoid, not
+    joining early.
+    """
+    seconds = min(max(settings.pvp_countdown_seconds * 0.25, 0.25), 3.0)
+    return timedelta(seconds=seconds)
+
+
+async def quick_join(
+    session: AsyncSession, user: User, amount: int, *, idempotency_key: str | None = None
+) -> tuple[PvPGame, bool]:
+    """Seat the player in the current round, opening one if there is none.
+
+    Matchmaking is serialised so two players pressing the button at the same
+    moment end up in the same round rather than in two half-empty ones.
+    Returns (game, created).
+    """
+    amount = validate_bet(amount)
+
+    async with distributed_lock("pvp:matchmaking", ttl=10):
+        now = _now()
+        candidates = (
+            await session.execute(
+                select(PvPGame)
+                .where(PvPGame.status.in_([PvPStatus.WAITING.value, PvPStatus.STARTING.value]))
+                .order_by(PvPGame.created_at.desc())
+                .limit(10)
+            )
+        ).scalars().all()
+
+        for game in candidates:
+            spin_at = _aware(game.spin_at)
+            if spin_at and spin_at <= now + _join_grace():
+                continue
+            if len(game.players) >= game.max_players and not any(
+                p.user_id == user.id for p in game.players
+            ):
+                continue
+            return await join_game(session, user, game.id, amount, idempotency_key=idempotency_key), False
+
+        return await create_game(session, user, amount, idempotency_key=idempotency_key), True
+
+
+async def current_game(session: AsyncSession) -> PvPGame | None:
+    """The round the arena screen should show: the live one, else the last result."""
+    live = await session.scalar(
+        select(PvPGame)
+        .where(
+            PvPGame.status.in_(
+                [PvPStatus.WAITING.value, PvPStatus.STARTING.value, PvPStatus.SPINNING.value]
+            )
+        )
+        .order_by(PvPGame.created_at.desc())
+        .limit(1)
+    )
+    if live is not None:
+        return await ensure_progress(session, live.id)
+
+    return await session.scalar(
+        select(PvPGame)
+        .where(PvPGame.status == PvPStatus.FINISHED.value)
+        .order_by(PvPGame.finished_at.desc())
+        .limit(1)
+    )
+
+
 async def ensure_progress(session: AsyncSession, game_id: int) -> PvPGame:
     """Advance a round to whatever state its timestamps imply, then return it."""
     game = await session.get(PvPGame, game_id)

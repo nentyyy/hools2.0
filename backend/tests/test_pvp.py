@@ -112,3 +112,55 @@ async def test_duplicate_join_key_does_not_double_charge(client):
     assert first.status_code == second.status_code == 200
     assert first.json()["balance"] == second.json()["balance"] == 750
     assert second.json()["game"]["total_pool"] == 350
+
+
+async def test_quick_join_puts_players_in_the_same_round(client):
+    """The arena shows one round, so matchmaking must not fragment it."""
+    a, _ = await _login(client, 7101)
+    b, _ = await _login(client, 7102)
+    c, _ = await _login(client, 7103)
+
+    # Open a fresh round explicitly: the newest open lobby is the one matchmaking
+    # should pick, whatever earlier tests left lying around.
+    game_id = (await client.post("/api/pvp/create", json={"amount": 100}, headers=a)).json()["game"]["id"]
+
+    second = await client.post("/api/pvp/quick-join", json={"amount": 200}, headers=b)
+    third = await client.post("/api/pvp/quick-join", json={"amount": 50}, headers=c)
+
+    assert second.status_code == third.status_code == 200
+    assert second.json()["created"] is False
+    assert third.json()["created"] is False
+    assert second.json()["game"]["id"] == game_id
+    assert third.json()["game"]["id"] == game_id
+    assert third.json()["game"]["total_pool"] == 350
+
+
+async def test_current_returns_the_live_round_then_the_last_result(client):
+    import asyncio
+
+    a, _ = await _login(client, 7104)
+    b, _ = await _login(client, 7105)
+
+    game_id = (await client.post("/api/pvp/quick-join", json={"amount": 100}, headers=a)).json()["game"]["id"]
+    live = (await client.get("/api/pvp/current", headers=a)).json()
+    assert live["game"]["id"] == game_id
+    assert live["config"]["rake_percent"] == 5
+
+    await client.post("/api/pvp/quick-join", json={"amount": 100}, headers=b)
+    await asyncio.sleep(2.4)
+
+    settled = (await client.get("/api/pvp/current", headers=a)).json()
+    assert settled["game"]["status"] == "finished"
+    assert settled["game"]["winner_id"] is not None
+
+
+async def test_highlights_report_the_last_and_biggest_rounds(client):
+    a, _ = await _login(client, 7106)
+    response = await client.get("/api/pvp/highlights", headers=a)
+    assert response.status_code == 200
+    body = response.json()
+    assert set(body) == {"last", "top", "online"}
+    assert body["online"] >= 1
+    if body["last"]:
+        assert body["last"]["winner"]["name"]
+        assert body["last"]["prize"] > 0

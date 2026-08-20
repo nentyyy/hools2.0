@@ -207,6 +207,14 @@ export const api = {
   pvpList: (params: { status?: string; limit?: number } = {}) =>
     request<{ items: PvPGame[]; config: PvPConfig }>(`/pvp${query(params)}`),
   pvpGame: (id: number) => request<{ game: PvPGame }>(`/pvp/${id}`),
+  pvpCurrent: () => request<{ game: PvPGame | null; config: PvPConfig }>("/pvp/current"),
+  pvpHighlights: () => request<PvPHighlights>("/pvp/highlights"),
+  pvpQuickJoin: (amount: number, key: string) =>
+    request<{ game: PvPGame; balance: number; created: boolean }>("/pvp/quick-join", {
+      method: "POST",
+      body: { amount },
+      idempotencyKey: key,
+    }),
   pvpState: (id: number, cursor = 0) =>
     request<{ game: PvPGame; events: PvPEventPayload[]; cursor: number }>(
       `/pvp/${id}/state${query({ cursor })}`,
@@ -309,6 +317,20 @@ export interface PvPConfig {
   countdown_seconds: number;
   spin_seconds: number;
   max_players: number;
+}
+
+export interface PvPHighlightEntry {
+  game_id: number;
+  prize: number;
+  pool: number;
+  chance: number | null;
+  winner: { id: number; name: string; username: string | null; avatar: string | null } | null;
+}
+
+export interface PvPHighlights {
+  last: PvPHighlightEntry | null;
+  top: PvPHighlightEntry | null;
+  online: number;
 }
 
 export interface PvPEventPayload {

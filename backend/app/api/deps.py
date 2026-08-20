@@ -114,13 +114,15 @@ class RateLimiter:
         credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer_scheme)] = None,
     ) -> None:
         identity = request.client.host if request.client else "anonymous"
+        presence_id: str | None = None
         if credentials and credentials.credentials:
             # An invalid token simply falls back to per-IP limiting.
             with contextlib.suppress(AuthError):
                 identity = f"u{decode_access_token(credentials.credentials).get('sub')}"
+                presence_id = identity
 
         allowed, retry_after = await rate_limit_hit(
-            f"{self.scope}:{identity}", self.limit, self.window
+            f"{self.scope}:{identity}", self.limit, self.window, presence_id=presence_id
         )
         if not allowed:
             logger.info("rate_limited", extra={"scope": self.scope, "identity": identity})
