@@ -11,7 +11,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
-import { OddsBar } from "@/components/OddsBar";
+import { CloverReel } from "@/components/CloverReel";
 import { Card, Screen, Skeleton } from "@/components/ui";
 import { api, newIdempotencyKey, type ShopGift } from "@/lib/api";
 import { gg, multiplier, percent } from "@/lib/format";
@@ -160,32 +160,36 @@ export function LuckyBuyPage() {
         <div className="row-between" style={{ marginBottom: "var(--sp-2)" }}>
           <span className="section-title">Win chance</span>
           <span className="chip" data-active="true">
-            {percent(chance, chance < 0.1 ? 1 : 0)}
+            {percent(chance, 0)}
           </span>
         </div>
 
         <input
           className="slider"
           type="range"
-          min={Math.round(gift.min_chance * 1000)}
-          max={Math.round(gift.max_chance * 1000)}
-          step={5}
-          value={Math.round(chance * 1000)}
+          min={Math.round(gift.min_chance * 100)}
+          max={Math.round(gift.max_chance * 100)}
+          step={1}
+          value={Math.round(chance * 100)}
           disabled={play.isPending}
           onChange={(event) => {
-            setChance(Number(event.target.value) / 1000);
+            setChance(Number(event.target.value) / 100);
             setOutcome(null);
           }}
         />
 
         <div style={{ margin: "var(--sp-4) 0 var(--sp-3)" }}>
-          <OddsBar
+          <CloverReel
             chance={chance}
             roll={outcome?.roll ?? null}
             playId={outcome?.playId ?? 0}
             skip={skip}
             onSettled={handleSettled}
           />
+          <p className="faint" style={{ marginTop: 6, textAlign: "center" }}>
+            {Math.round(chance * 100)} clovers out of 100 tiles
+            {outcome && revealed ? ` · roll ${outcome.roll.toFixed(4)}` : ""}
+          </p>
         </div>
 
         <div className="payout-row">

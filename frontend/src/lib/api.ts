@@ -288,6 +288,17 @@ export const api = {
     request<Page<StarPayment>>(`/payments/history${query(params)}`),
   paySupport: () => request<{ text: string }>("/payments/support"),
 
+  /* --------------------------------- admin -------------------------------- */
+  adminUsers: (params: { q?: string; limit?: number } = {}) =>
+    request<Page<User>>(`/admin/users${query(params)}`),
+  adminAdjustBalance: (userId: number, amount: number, description: string, key: string) =>
+    request<{ ok: boolean; user_id: number; balance: number }>(`/admin/users/${userId}/balance`, {
+      method: "POST",
+      body: { amount, description },
+      idempotencyKey: key,
+    }),
+  adminStats: () => request<AdminStats>("/admin/stats"),
+
   /* ---------------------------------- TON -------------------------------- */
   tonWallet: () => request<TonWalletResponse>("/ton/wallet"),
   tonConnect: (body: TonConnectBody, key: string) =>
@@ -389,6 +400,13 @@ export interface IceArenaState {
   potential_reward: number;
   history: { round: number; difficulty: string; chance: number; step: number; survived: boolean; reward: number }[];
   options: { difficulty: string; chance: number; step: number; reward: number }[];
+}
+
+export interface AdminStats {
+  users: { total: number; new_24h: number; banned: number; active_24h: number };
+  economy: { gg_circulating: number; stars_collected: number; payments_paid: number; payments_refunded: number };
+  games: { pvp_total: number; pvp_live: number; solo_24h: number };
+  giveaways: { active: number; finished: number };
 }
 
 export interface ShopGift {

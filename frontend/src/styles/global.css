@@ -1024,3 +1024,60 @@ a { color: var(--accent); text-decoration: none; }
   font-size: 16px;
   color: var(--text-dim);
 }
+
+/* ---------- clover reel ---------- */
+.clover-reel {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  padding: var(--sp-3) 0;
+}
+
+.clover-strip {
+  display: flex;
+  gap: 6px;
+  will-change: transform;
+}
+
+.clover-tile {
+  flex: 0 0 54px;
+  height: 54px;
+  border-radius: var(--r-sm);
+  background: var(--surface-1);
+  border: 1px solid var(--line);
+  display: grid;
+  place-items: center;
+  color: var(--text-faint);
+  transition: transform 180ms var(--ease), border-color 180ms var(--ease), background 180ms var(--ease);
+}
+.clover-tile[data-clover="true"] {
+  background: rgba(184, 207, 154, 0.1);
+  border-color: rgba(184, 207, 154, 0.28);
+}
+.clover-tile[data-landed="true"] {
+  transform: scale(1.08);
+  border-color: var(--text);
+}
+.clover-tile[data-landed="true"][data-clover="true"] {
+  background: rgba(184, 207, 154, 0.28);
+  border-color: var(--win);
+  box-shadow: 0 0 18px -4px var(--win);
+}
+.clover-tile[data-landed="true"][data-clover="false"] {
+  border-color: var(--lose);
+  box-shadow: 0 0 18px -6px var(--lose);
+}
+
+.mode-icon {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  color: var(--accent);
+  flex: 0 0 auto;
+}

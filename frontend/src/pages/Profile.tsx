@@ -2,7 +2,9 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 
+import { ShieldIcon } from "@/components/icons";
 import { WalletCard } from "@/components/WalletCard";
 import { Avatar, Bar, Card, Empty, Screen, SectionTitle, Skeleton, Stat } from "@/components/ui";
 import { api, newIdempotencyKey } from "@/lib/api";
@@ -16,6 +18,7 @@ type Tab = "inventory" | "history" | "referrals";
 export function ProfilePage() {
   const toast = useToast();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const { setBalance, refresh } = useSession();
   const [tab, setTab] = useState<Tab>("inventory");
 
@@ -198,6 +201,12 @@ export function ProfilePage() {
             ))}
           </Card>
         )
+      ) : null}
+
+      {user.is_admin ? (
+        <button className="btn btn-block" onClick={() => navigate("/admin")}>
+          <ShieldIcon size={18} /> Admin panel
+        </button>
       ) : null}
 
       <WalletCard />

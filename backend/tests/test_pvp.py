@@ -189,3 +189,24 @@ async def test_the_draw_is_published_when_the_spin_starts(client):
     # Settlement must land on the number that was already published.
     assert settled["winning_roll"] == roll
     assert settled["server_seed"]
+
+
+async def test_the_arena_clears_once_a_result_has_been_read(client, monkeypatch):
+    """A finished round lingers, then the arena is empty again rather than stuck."""
+    from datetime import timedelta
+
+    from app.services import pvp as service
+
+    host, _ = await _login(client, 7109)
+    guest, _ = await _login(client, 7110)
+
+    await client.post("/api/pvp/quick-join", json={"amount": 100}, headers=host)
+    await client.post("/api/pvp/quick-join", json={"amount": 100}, headers=guest)
+    await asyncio.sleep(2.4)
+
+    settled = (await client.get("/api/pvp/current", headers=host)).json()
+    assert settled["game"]["status"] == "finished", "the result is shown right after the draw"
+
+    monkeypatch.setattr(service, "RESULT_LINGER", timedelta(seconds=0))
+    cleared = (await client.get("/api/pvp/current", headers=host)).json()
+    assert cleared["game"] is None

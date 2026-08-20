@@ -5,17 +5,17 @@ import { useNavigate } from "react-router-dom";
 
 import { SOLO_MODES } from "@shared/index";
 
+import { CardsIcon, IceIcon, PlinkoIcon, UpgradeIcon } from "@/components/icons";
 import { Card, Empty, Screen, SectionTitle, Skeleton } from "@/components/ui";
 import { api } from "@/lib/api";
 import { gg, multiplier, relative } from "@/lib/format";
 import { haptics } from "@/lib/telegram";
 
-const ICONS: Record<string, string> = {
-  plinko: "🟣",
-  upgrade: "🔺",
-  "lucky-buy": "🎁",
-  "hi-lo": "🃏",
-  "ice-arena": "🧊",
+const ICONS: Record<string, (props: { size?: number }) => JSX.Element> = {
+  plinko: PlinkoIcon,
+  upgrade: UpgradeIcon,
+  "hi-lo": CardsIcon,
+  "ice-arena": IceIcon,
 };
 
 export function SoloPage() {
@@ -65,7 +65,10 @@ export function SoloPage() {
             }}
           >
             <div className="row">
-              <span style={{ fontSize: 26 }}>{ICONS[mode.slug]}</span>
+              <span className="mode-icon">{(() => {
+                const Icon = ICONS[mode.slug] ?? PlinkoIcon;
+                return <Icon size={22} />;
+              })()}</span>
               <div className="stack" style={{ gap: 0 }}>
                 <strong>{mode.title}</strong>
                 <span className="faint">{mode.blurb}</span>

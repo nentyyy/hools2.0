@@ -255,8 +255,17 @@ async def quick_join(
         return await create_game(session, user, amount, idempotency_key=idempotency_key), True
 
 
+# How long a settled round keeps the arena before it clears for the next one.
+RESULT_LINGER = timedelta(seconds=20)
+
+
 async def current_game(session: AsyncSession) -> PvPGame | None:
-    """The round the arena screen should show: the live one, else the last result."""
+    """The round the arena should show.
+
+    A live round wins. Otherwise the last result lingers briefly so everyone can
+    read it, and then the arena goes empty again — leaving a finished round on
+    screen indefinitely makes a quiet lobby look like a frozen one.
+    """
     live = await session.scalar(
         select(PvPGame)
         .where(
@@ -270,12 +279,16 @@ async def current_game(session: AsyncSession) -> PvPGame | None:
     if live is not None:
         return await ensure_progress(session, live.id)
 
-    return await session.scalar(
+    recent = await session.scalar(
         select(PvPGame)
         .where(PvPGame.status == PvPStatus.FINISHED.value)
         .order_by(PvPGame.finished_at.desc())
         .limit(1)
     )
+    if recent is None:
+        return None
+    finished_at = _aware(recent.finished_at)
+    return recent if finished_at and _now() - finished_at <= RESULT_LINGER else None
 
 
 async def ensure_progress(session: AsyncSession, game_id: int) -> PvPGame:

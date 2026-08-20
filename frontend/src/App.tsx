@@ -11,6 +11,7 @@ import { ProfilePage } from "@/pages/Profile";
 import { PvpHistoryPage } from "@/pages/PvpHistory";
 import { PvpRoomPage } from "@/pages/PvpRoom";
 import { SoloPage } from "@/pages/Solo";
+import { AdminPage } from "@/pages/Admin";
 import { LuckyBuyPage } from "@/pages/LuckyBuy";
 import { ShopPage } from "@/pages/Shop";
 import { HiLoPage } from "@/pages/solo/HiLo";
@@ -74,6 +75,7 @@ export default function App() {
           <Route path="/solo/ice-arena" element={<IceArenaPage />} />
           <Route path="/giveaways" element={<GiveawaysPage />} />
           <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/admin" element={<AdminPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>

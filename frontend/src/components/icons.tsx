@@ -85,3 +85,54 @@ export function BagIcon(props: IconProps) {
     </Svg>
   );
 }
+
+export function PlinkoIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <circle cx="12" cy="4.5" r="1.5" fill="currentColor" />
+      <circle cx="8" cy="10" r="1.2" fill="currentColor" opacity="0.5" />
+      <circle cx="16" cy="10" r="1.2" fill="currentColor" opacity="0.5" />
+      <circle cx="6" cy="15" r="1.2" fill="currentColor" opacity="0.5" />
+      <circle cx="12" cy="15" r="1.2" fill="currentColor" opacity="0.5" />
+      <circle cx="18" cy="15" r="1.2" fill="currentColor" opacity="0.5" />
+      <path {...stroke} d="M3.5 20h17" />
+    </Svg>
+  );
+}
+
+export function UpgradeIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path {...stroke} d="M12 19.5V5.5M12 4.5l5 5M12 4.5l-5 5" />
+      <path {...stroke} d="M5 21h14" />
+    </Svg>
+  );
+}
+
+export function CardsIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <rect {...stroke} x="8.5" y="5.5" width="11" height="14" rx="2.5" />
+      <path {...stroke} d="M6 8v9.5A2.5 2.5 0 0 0 8.5 20" opacity="0.7" />
+      <path {...stroke} d="M14 9.5l1.6 3 1.6-3M14 15.5h3.2" />
+    </Svg>
+  );
+}
+
+export function IceIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path {...stroke} d="M12 3v18M4 7.5l16 9M20 7.5l-16 9" />
+      <path {...stroke} d="M12 6.5 10 5m2 1.5L14 5m-2 12.5L10 19m2-1.5L14 19" />
+    </Svg>
+  );
+}
+
+export function ShieldIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path {...stroke} d="M12 3.5 19 6v5.6c0 4-2.8 7.4-7 8.9-4.2-1.5-7-4.9-7-8.9V6z" />
+      <path {...stroke} d="m9 12 2.2 2.2L15.5 10" />
+    </Svg>
+  );
+}
